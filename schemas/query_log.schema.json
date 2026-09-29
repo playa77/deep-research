@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "QueryLogEntry",
+  "description": "One executed search. Lives in acquisition/query_log.jsonl (merged) and per-agent fragments acquisition/agents/*.queries.jsonl. Search is disposable but the log is the audit trail of what was tried.",
+  "type": "object",
+  "required": ["query_id", "query_text", "tool", "agent", "ts"],
+  "properties": {
+    "query_id": {
+      "type": "string",
+      "description": "Stable id; assigned at merge (q_<sha1[:10]>) if the agent did not set one"
+    },
+    "query_text": {
+      "type": "string",
+      "description": "The exact query string executed"
+    },
+    "tool": {
+      "type": "string",
+      "description": "Search tool used: web_search | web_extract | browser_exec | academic_api | other"
+    },
+    "agent": {
+      "type": "string",
+      "description": "Acquisition agent identifier (e.g. acquisition-agent-03)"
+    },
+    "ts": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the search ran"
+    },
+    "search_angle": {
+      "type": ["string", "null"],
+      "description": "Slug of the planned angle this query served",
+      "default": null
+    },
+    "result_count": {
+      "type": ["integer", "null"],
+      "description": "Number of results returned",
+      "default": null
+    },
+    "top_urls": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "Top result URLs actually considered",
+      "default": null
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "Dead ends, rate limits, hostile pages, query variants worth retrying",
+      "default": null
+    }
+  },
+  "additionalProperties": false
+}

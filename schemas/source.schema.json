@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Source",
+  "description": "A discovered source. Core identity from 199-biotechnologies (source_id = sha256(canonical_locator)[:16]); provenance fields describe how the acquisition engine found it. Lives in acquisition/sources.jsonl (merged) and per-agent fragments.",
+  "type": "object",
+  "required": ["source_id", "canonical_locator", "raw_url", "title", "origin", "medium", "metadata_status", "registered_at"],
+  "properties": {
+    "source_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$",
+      "description": "sha256(canonical_locator)[:16] — stable across edits, continuation, and re-acquisition"
+    },
+    "canonical_locator": {
+      "type": "string",
+      "description": "Canonical identifier: doi:10.1038/..., arxiv:2305.14251, or normalized URL (scheme+host+path, no fragment/tracking params)"
+    },
+    "raw_url": {
+      "type": "string",
+      "description": "Original URL as retrieved, before normalization"
+    },
+    "title": {
+      "type": "string"
+    },
+    "authors": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "default": null
+    },
+    "year": {
+      "type": ["string", "null"],
+      "default": null
+    },
+    "publisher": {
+      "type": ["string", "null"],
+      "description": "Publishing organization, journal, or outlet",
+      "default": null
+    },
+    "published": {
+      "type": ["string", "null"],
+      "description": "Publication date, ISO 8601 (YYYY-MM-DD or full timestamp); null if unknown — never guessed",
+      "default": null
+    },
+    "retrieved": {
+      "type": ["string", "null"],
+      "description": "Date the content was fetched, ISO 8601",
+      "default": null
+    },
+    "origin": {
+      "type": "string",
+      "enum": ["primary", "secondary", "tertiary"],
+      "description": "Epistemic distance from the event/fact: primary (original records, data, filings, first reporting), secondary (analysis/reports about primary material), tertiary (aggregations, encyclopedias, SEO content)"
+    },
+    "medium": {
+      "type": "string",
+      "enum": ["web", "academic", "documentation", "code", "news", "government", "book"],
+      "description": "What kind of resource it is (199-biotechnologies' source_type enum)"
+    },
+    "metadata_status": {
+      "type": "string",
+      "enum": ["unverified", "doi_verified", "url_verified", "title_matched"],
+      "description": "How far metadata has been verified"
+    },
+    "search_angle": {
+      "type": ["string", "null"],
+      "description": "Slug of the planned search angle that produced this source (e.g. french-government-records)",
+      "default": null
+    },
+    "discovered_by": {
+      "type": ["string", "null"],
+      "description": "Identifier of the acquisition agent that first registered it (e.g. acquisition-agent-03)",
+      "default": null
+    },
+    "raw_file": {
+      "type": ["string", "null"],
+      "description": "Path of the extracted full text relative to acquisition/ (e.g. raw/a03-001.md)",
+      "default": null
+    },
+    "registered_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when source was registered"
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RunManifest",
+  "description": "Manifest for a single merged-pipeline research run. Created by citation_manager.py init-run, updated as phases complete.",
+  "type": "object",
+  "required": ["version", "query", "mode", "started_at", "report_dir", "artifact_paths"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "const": "1.0.0",
+      "description": "Merged deep-research pipeline version"
+    },
+    "query": {
+      "type": "string",
+      "description": "Original research question"
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["quick", "standard", "deep", "ultradeep"]
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "finished_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "default": null
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["assumption_id", "text", "materiality", "status"],
+        "properties": {
+          "assumption_id": { "type": "string", "pattern": "^asm_[0-9a-f]{8}$" },
+          "text": { "type": "string" },
+          "materiality": { "type": "string", "enum": ["low", "medium", "high"] },
+          "status": {
+            "type": "string",
+            "enum": ["implicit", "user_confirmed", "evidence_validated"]
+          }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "hypotheses": {
+      "type": "array",
+      "description": "Testable hypotheses formed at SCOPE (deep/ultradeep); seeds acquisition angles and the counterevidence pass",
+      "items": {
+        "type": "object",
+        "required": ["id", "statement"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^H[0-9]+$" },
+          "statement": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["testing", "supported", "disconfirmed", "inconclusive"],
+            "default": "testing"
+          }
+        },
+        "additionalProperties": false
+      },
+      "default": []
+    },
+    "provider_config": {
+      "type": "object",
+      "properties": {
+        "primary": {
+          "type": "string",
+          "description": "Primary search tool (Hermes: web_search)"
+        },
+        "scholarly": {
+          "type": ["string", "null"],
+          "description": "Scholarly API provider if configured (e.g. openalex, semantic_scholar)"
+        }
+      },
+      "default": { "primary": "web_search", "scholarly": null }
+    },
+    "report_dir": {
+      "type": "string",
+      "description": "Absolute path to the research run directory"
+    },
+    "artifact_paths": {
+      "type": "object",
+      "required": ["query_plan", "query_log", "sources", "leads", "raw_dir", "corpus", "evidence", "claims", "report"],
+      "properties": {
+        "query_plan": { "type": "string", "default": "acquisition/query_plan.md" },
+        "query_log": { "type": "string", "default": "acquisition/query_log.jsonl" },
+        "sources": { "type": "string", "default": "acquisition/sources.jsonl" },
+        "leads": { "type": "string", "default": "acquisition/leads.jsonl" },
+        "raw_dir": { "type": "string", "default": "acquisition/raw" },
+        "corpus": { "type": "string", "default": "triage/corpus.jsonl" },
+        "triage_report": { "type": "string", "default": "triage/triage_report.md" },
+        "evidence": { "type": "string", "default": "evidence/evidence.jsonl" },
+        "claims": { "type": "string", "default": "evidence/claims.jsonl" },
+        "report": { "type": "string", "default": "report/report.md" },
+        "qa_report": { "type": "string", "default": "qa/qa_report.md" }
+      },
+      "additionalProperties": false
+    },
+    "phases_completed": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Phase names completed so far (scope, acquire, triage, evidence, triangulate, synthesize, critique, qa). A fresh session resumes from the first missing phase — state lives on disk, not in context.",
+      "default": []
+    },
+    "continuation": {
+      "type": ["object", "null"],
+      "description": "Populated when resuming a previous run",
+      "properties": {
+        "previous_run_manifest": { "type": "string" },
+        "resumed_at": { "type": "string", "format": "date-time" },
+        "sections_completed": { "type": "array", "items": { "type": "string" } }
+      },
+      "default": null
+    }
+  },
+  "additionalProperties": false
+}

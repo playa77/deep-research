@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CorpusSource",
+  "description": "A source record after SOURCE TRIAGE: base Source fields plus triage decisions. Lives in triage/corpus.jsonl; this is the only input the evidence engine is allowed to read for source identity.",
+  "type": "object",
+  "required": ["source_id", "canonical_locator", "raw_url", "title", "origin", "medium", "metadata_status", "registered_at", "credibility", "independence_group_id", "triage_status", "selection_reason"],
+  "properties": {
+    "source_id": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
+    "canonical_locator": { "type": "string" },
+    "raw_url": { "type": "string" },
+    "title": { "type": "string" },
+    "authors": { "type": ["array", "null"], "items": { "type": "string" }, "default": null },
+    "year": { "type": ["string", "null"], "default": null },
+    "publisher": { "type": ["string", "null"], "default": null },
+    "published": { "type": ["string", "null"], "default": null },
+    "retrieved": { "type": ["string", "null"], "default": null },
+    "origin": { "type": "string", "enum": ["primary", "secondary", "tertiary"] },
+    "medium": { "type": "string", "enum": ["web", "academic", "documentation", "code", "news", "government", "book"] },
+    "metadata_status": { "type": "string", "enum": ["unverified", "doi_verified", "url_verified", "title_matched"] },
+    "search_angle": { "type": ["string", "null"], "default": null },
+    "discovered_by": { "type": ["string", "null"], "default": null },
+    "raw_file": { "type": ["string", "null"], "default": null },
+    "registered_at": { "type": "string", "format": "date-time" },
+
+    "content_hash": {
+      "type": ["string", "null"],
+      "description": "sha256 of normalized raw body text [:16] — used for exact-duplicate detection",
+      "default": null
+    },
+    "duplicate_of": {
+      "type": ["string", "null"],
+      "description": "source_id this row exactly duplicates",
+      "default": null
+    },
+    "syndication_with": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "source_ids of same-origin syndicated/derivative copies",
+      "default": null
+    },
+    "credibility": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "SourceEvaluator credibility score (0-100)"
+    },
+    "trust_recommendation": {
+      "type": ["string", "null"],
+      "enum": ["high_trust", "moderate_trust", "low_trust", "verify", null],
+      "default": null
+    },
+    "independence_group_id": {
+      "type": "string",
+      "description": "Origin cluster: sources sharing a registrable domain or syndication lineage share one group. Corroboration must count groups, not rows."
+    },
+    "triage_status": {
+      "type": "string",
+      "enum": ["selected", "reserve", "dropped"],
+      "description": "selected = enters the evidence phase; reserve = kept only for cross-checking after verification; dropped = excluded"
+    },
+    "selection_reason": {
+      "type": "string",
+      "description": "Human-readable rationale for the triage decision"
+    }
+  },
+  "additionalProperties": false
+}
