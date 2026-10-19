@@ -27,7 +27,7 @@
     },
     "quote": {
       "type": "string",
-      "description": "Exact or near-exact text extracted from the source"
+      "description": "Verbatim source text. Release evidence must match exact source offsets; paraphrases cannot anchor a claim."
     },
     "evidence_type": {
       "type": "string",

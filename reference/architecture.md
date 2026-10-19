@@ -137,13 +137,13 @@ explicit gates — hence 8 checks, including the two cheap orthogonal ones the
 
 ## Cost discipline
 
-The merged pipeline is strictly cheaper than running two complete
-methodologies back-to-back because:
+The merge avoids some duplicated work compared with running two complete
+methodologies back-to-back:
 
 - acquisition agents never synthesize (contract),
 - deduplication happens once, at the merge boundary,
 - credibility scoring and clustering happen once, in triage,
-- verification/independence reasoning happens once, in the evidence engine,
+- durable evidence can be reused by the mandatory independent reviewers,
 - triage shrinks the corpus before investigator reasoning is spent,
 - all state is on disk, so context failures cost a re-read, not a re-search.
 
@@ -161,3 +161,12 @@ methodologies back-to-back because:
   199-biotechnologies' lineage is documented in its README. This repository is
   MIT; the merge itself and all new code (`citation_manager.py` extensions,
   `triage.py`, schemas, references) are original to this repo.
+
+## Verification hardening
+
+The normative [fact-checking contract](fact-checking.md) supersedes legacy
+lexical support heuristics and persona critiques. It adds complete report
+coverage, original-response provenance, exact anchors, bounded calculations,
+and distinct verifier/red-team sessions for every claim and evidence link.
+This adds review cost; reduce scope when necessary, never the verification
+standard. The gate checks integrity and recorded judgments, not objective truth.

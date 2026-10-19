@@ -84,6 +84,22 @@ class TestExtract(unittest.TestCase):
         self.assertEqual(out2['claims_added'], 0)
         self.assertEqual(out2['claims_skipped'], out1['claims_added'])
 
+    def test_deletion_removes_stale_claims(self):
+        run_ec('extract', '--report', self.report_path, '--dir', self.tmpdir)
+        with open(self.report_path, 'w') as f:
+            f.write('## Finding 1\nCats fly.\n')
+        out = run_ec('extract', '--report', self.report_path, '--dir', self.tmpdir)
+        self.assertGreater(out['claims_removed'], 0)
+        claims = run_ec('list', '--dir', self.tmpdir)['claims']
+        self.assertEqual([c['text'] for c in claims], ['Cats fly.'])
+
+    def test_short_and_table_and_methodology_candidates_not_dropped(self):
+        with open(self.report_path, 'w') as f:
+            f.write('## Methodology\nCats fly.\n| Result | 25% |\n')
+        run_ec('extract', '--report', self.report_path, '--dir', self.tmpdir)
+        claims = run_ec('list', '--dir', self.tmpdir)['claims']
+        self.assertEqual([c['text'] for c in claims], ['Cats fly.', '| Result | 25% |'])
+
     def test_claim_types_assigned(self):
         run_ec('extract', '--report', self.report_path, '--dir', self.tmpdir)
         out = run_ec('stats', '--dir', self.tmpdir)

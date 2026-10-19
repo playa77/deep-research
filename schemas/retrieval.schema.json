@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Persisted original retrieval response",
+  "type": "object",
+  "required": [
+    "source_id",
+    "requested_url",
+    "final_url",
+    "tool",
+    "execution_ref",
+    "content_file",
+    "extraction_method",
+    "retrieved_at",
+    "kind",
+    "http_status",
+    "content_sha256"
+  ],
+  "properties": {
+    "source_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{16}$"
+    },
+    "requested_url": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "final_url": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "tool": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "execution_ref": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "content_file": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "extraction_method": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S"
+    },
+    "retrieved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "kind": {
+      "enum": [
+        "http_response",
+        "tool_response",
+        "uploaded_document"
+      ]
+    },
+    "http_status": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "content_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "additionalProperties": false
+}

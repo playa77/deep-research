@@ -1,87 +1,109 @@
-# Deep Research — merged skill for Hermes
+# Deep Research — evidence and adversarial verification for Hermes
 
-A Hermes Agent skill that merges two upstream research skills at a clean
-boundary rather than splicing two complete workflows:
+A multi-source research skill combining broad acquisition, durable evidence,
+source triage and a **fail-closed fact-checking release contract**. No paid
+verification API, hosted service or additional model subscription is required.
+Use the available search tools and models; Python validation runs locally.
 
-| Source | Contribution here |
-|---|---|
-| [standardhuman/deep-research-skill](https://github.com/standardhuman/deep-research-skill) | The **acquisition engine**: search-angle decomposition, parallel retrieval agents, broad fetch/extract, budgets/stop rules, prompt-injection firewall, hypothesis steering |
-| [199-biotechnologies/claude-deep-research-skill](https://github.com/199-biotechnologies/claude-deep-research-skill) | The **evidence laboratory**: stable source identity, append-only evidence/claim stores, triangulation, counterevidence, verification scripts, prose-first synthesis, progressive assembly |
+The previous strict checker could approve a missing ledger, negated claims,
+wrong magnitudes and incomplete review. The hardened implementation removes
+word overlap as evidence of support and requires:
 
-Conceptually: **standardhuman = reconnaissance; 199-biotech = evidence
-laboratory.** A new **SOURCE TRIAGE** phase joins them: dedupe/syndication
-detection → origin clustering → credibility scoring → primary-source
-prioritization → coverage-gap detection → a curated corpus (mode-scaled,
-roughly 10–100 sources) that the expensive reasoning phases work from.
+- Original retrieval responses and provenance, plus faithful extracted text
+  and exact quotation offsets, all bound by SHA-256.
+- A disposition for every nonblank report line, including tables, footnotes,
+  short statements and sections previously skipped. Manual atomic claims must
+  match the coverage inventory and rendered citations.
+- Separate actual verifier and red-team sessions reviewing every claim, every
+  evidence link and the verifier's fact checks, with claim/input-bound records.
+- Independent-origin corroboration, recorded countersearches, reviewed contrary
+  evidence, exact Decimal arithmetic and calendar-aware date calculations.
+- A current machine-readable release result. Missing, stale, uncertain or
+  failed reviews block release; there is no waiver or force-pass option.
 
-The final QA gate runs **eight checks**, adding two cheap orthogonal ones the
-upstream evidence pipeline lacked — numerical sanity and temporal/date
-arithmetic — because *"did the source say X"* ≠ *"is X true"*.
+This makes the evidence trail and required judgments checkable. It **cannot
+make research bulletproof**: sources and reviewers can be wrong, searches can
+miss evidence, and an operator can fabricate a consistent bundle. Hashes prove
+local integrity, not remote authenticity or truth. A `contract_pass` result
+means the audit requirements passed. Domain expertise and honest uncertainty
+remain necessary. See [the audit](reference/hardening-audit.md) for findings,
+regression coverage and residual limits.
 
-## The acquisition/evidence contract
+## Install
 
-The most valuable design feature is the interface between the halves —
-see [`reference/contract.md`](reference/contract.md). Acquisition agents
-produce an on-disk **bundle** (query log, source registry, raw extracted
-files with provenance frontmatter, leads) and are forbidden from returning
-conclusions. Evidence investigators consume only the triaged corpus and the
-bundle; they never re-search. All state is durable JSONL/markdown:
-
-- **Search is disposable; evidence is durable.** Any phase can be resumed by
-  a fresh session from `run_manifest.json` + the bundle, with zero re-search.
-- Either half can be swapped without touching the other.
-
-## Pipeline
-
-```
-SCOPE & PLAN → ACQUIRE (parallel agents) → SOURCE TRIAGE → EVIDENCE
-→ TRIANGULATE & COUNTEREVIDENCE → SYNTHESIZE → CRITIQUE & GAP-FILL
-→ FINAL QA (8 checks) → report/
-```
-
-Modes: quick / standard / deep / ultradeep (see
-[`SKILL.md`](SKILL.md) for the mode table and phase procedure).
-
-## Layout
-
-```
-SKILL.md                skill entry point (install target)
-reference/              contract, acquisition, triage, evidence, synthesis, final QA, architecture
-schemas/                JSON schemas for every JSONL row + run manifest
-scripts/                pipeline tooling (stdlib-only Python)
-templates/              report template
-tests/                  unittest suite (67 tests, no network)
-```
-
-Scripts: `citation_manager.py` (identity, init, merge, source map,
-bibliography), `triage.py` (dedupe → clusters → score → curate → gaps),
-`evidence_store.py`, `extract_claims.py`, `link_claims.py` (report `[N]`
-↔ stable source_ids), `verify_claim_support.py`, `verify_citations.py`,
-`validate_report.py`, `source_evaluator.py`.
-
-## Install into Hermes
+Python 3.10+ and pip or uv are required. The only added dependency is the free
+local `jsonschema` validator, pinned in `requirements.txt`.
 
 ```bash
+python -m pip install -r requirements.txt
+# Or: uv pip install -r requirements.txt
 mkdir -p ~/.hermes/skills/research
-cp -r <this repo> ~/.hermes/skills/research/deep-research
-# restart the session — the skill loader is initialized at session start
+cp -r <this-repo> ~/.hermes/skills/research/deep-research
+# Restart the Hermes session so it reloads the skill.
 ```
 
-Then: *"Deep research <topic>"* or *"deep research in ultradeep mode: <topic>"*.
+Then ask Hermes to deep research a topic. Read [SKILL.md](SKILL.md) and the
+[normative fact-checking contract](reference/fact-checking.md). Verification is
+mandatory in quick, standard, deep and ultradeep modes; reduce scope to fit the
+budget rather than skipping checks.
 
-## Tests
+## Final verification
+
+After acquiring original responses, triaging sources, persisting evidence and
+finishing the report and generated bibliography:
 
 ```bash
-python3 -m unittest discover -s tests
+python scripts/validate_report.py --report <run>/report/report.md
+python scripts/fact_check.py prepare --run-dir <run>
+# Complete atomic coverage and perform separate real verifier + red-team work.
+python scripts/fact_check.py inspect --run-dir <run>
+python scripts/fact_check.py verify --run-dir <run>
 ```
 
-## Attribution
+`prepare` never creates approvals and refuses to overwrite prior review.
+`inspect` prints digests and query IDs, not a release decision. Only `verify`
+exit 0 with `status: contract_pass`, matching the current report/bundle, plus
+passing format validation and the final synthesis read, permits reviewed
+release. It writes `qa/fact_check_result.json`, including failures.
 
-Both upstream projects are MIT. Ported scripts and schemas retain their
-origin; the merge, the triage phase, the bundle contract, `link_claims.py`,
-and all reference documentation are original to this repo. Full provenance
-notes in [`reference/architecture.md`](reference/architecture.md).
+Review tasks: [verifier prompt](templates/verification_prompt.md) and
+[red-team prompt](templates/red_team_prompt.md). JSON structure is specified in
+[the schema](schemas/fact_check.schema.json), with procedures and field meanings
+in [the contract](reference/fact-checking.md). Archive old reviews and repeat
+verification after substantive changes. Old bundles need original retrieval
+provenance and new reviews; they are not silently grandfathered in.
 
-## License
+Legacy `verify_claim_support.py ... --strict` and `verify_citations.py --strict`
+commands route to this same gate. Non-strict lexical/accessibility diagnostics
+cannot approve a report. Candidate extraction is only a drafting aid; the final
+contract has its own complete inventory and atomic claims.
 
-MIT — see [LICENSE](LICENSE).
+## Pipeline and layout
+
+Scope → acquire → triage → evidence → triangulate → synthesize → critique and
+delta-acquisition → independent verification and red team → release gate.
+
+State lives in a resumable acquisition/evidence bundle. Source IDs survive
+continuation; report-local display numbers must be regenerated after corpus
+changes. Review snapshots detect stale report, source, evidence and query-log
+inputs. See [the acquisition contract](reference/contract.md).
+
+`reference/` contains protocols and the audit; `scripts/` contains tooling;
+`schemas/` defines records; `templates/` contains the report and review prompts;
+`tests/` contains local adversarial regression and pipeline tests.
+
+```bash
+python -m unittest discover -s tests
+```
+
+Tests make no network calls and include synthetic review fixtures. Those
+fixtures are not a method for manufacturing real review approvals.
+
+## Attribution and license
+
+Acquisition architecture derives from
+[standardhuman/deep-research-skill](https://github.com/standardhuman/deep-research-skill).
+Evidence architecture and legacy validators derive from
+[199-biotechnologies/claude-deep-research-skill](https://github.com/199-biotechnologies/claude-deep-research-skill).
+The merged pipeline, triage, bundle contract and hardening are local additions.
+See [architecture](reference/architecture.md) and [MIT license](LICENSE).

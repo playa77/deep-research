@@ -15,6 +15,12 @@ discovered sources
   → triage/corpus.jsonl + triage_report.md
 ```
 
+Heuristic scores and clusters do not verify claims. Before final use, preserve
+original retrievals and obtain source-specific independent review under
+[fact-checking.md](fact-checking.md). Domain authority, recency and source
+counts are not truth guarantees. Verify actual origin lineage and substantive
+fitness; do not "upgrade" a source by changing a numeric score alone.
+
 ## Run it
 
 ```bash

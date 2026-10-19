@@ -96,7 +96,9 @@
         "evidence": { "type": "string", "default": "evidence/evidence.jsonl" },
         "claims": { "type": "string", "default": "evidence/claims.jsonl" },
         "report": { "type": "string", "default": "report/report.md" },
-        "qa_report": { "type": "string", "default": "qa/qa_report.md" }
+        "qa_report": { "type": "string", "default": "qa/qa_report.md" },
+        "fact_check": { "type": "string", "default": "qa/fact_check.json" },
+        "fact_check_result": { "type": "string", "default": "qa/fact_check_result.json" }
       },
       "additionalProperties": false
     },

@@ -21,7 +21,7 @@
     "claim_type": {
       "type": "string",
       "enum": ["factual", "synthesis", "recommendation", "speculation"],
-      "description": "Only factual claims hard-fail on lack of support"
+      "description": "Provisional drafting hint. No type is exempt from the separate fact-checking release contract."
     },
     "cited_source_ids": {
       "type": "array",
@@ -38,7 +38,7 @@
     "support_status": {
       "type": "string",
       "enum": ["unverified", "supported", "partial", "unsupported", "needs_review"],
-      "description": "Set by verify_claim_support.py"
+      "description": "Legacy diagnostic only. Release uses qa/fact_check.json and fact_check.py."
     },
     "_citation_numbers": {
       "type": "array",

@@ -191,6 +191,7 @@ def _make_source_record(data: dict, registered_at: str | None = None) -> tuple[d
         'search_angle': data.get('search_angle'),
         'discovered_by': data.get('discovered_by'),
         'raw_file': data.get('raw_file'),
+        'retrieval_record': data.get('retrieval_record'),
         'registered_at': registered_at or now_iso(),
     }
     return record, canonical
@@ -203,7 +204,7 @@ def _make_source_record(data: dict, registered_at: str | None = None) -> tuple[d
 def cmd_init_run(args: argparse.Namespace) -> None:
     """Create run dir skeleton, run_manifest.json, and empty artifact files."""
     out_dir = os.path.abspath(args.out_dir)
-    for sub in ('acquisition/raw', 'acquisition/agents', 'triage', 'evidence', 'report', 'qa'):
+    for sub in ('acquisition/raw', 'acquisition/original', 'acquisition/retrieval', 'acquisition/agents', 'triage', 'evidence', 'report', 'qa'):
         os.makedirs(os.path.join(out_dir, sub), exist_ok=True)
 
     artifact_paths = {
@@ -218,6 +219,8 @@ def cmd_init_run(args: argparse.Namespace) -> None:
         'claims': 'evidence/claims.jsonl',
         'report': 'report/report.md',
         'qa_report': 'qa/qa_report.md',
+        'fact_check': 'qa/fact_check.json',
+        'fact_check_result': 'qa/fact_check_result.json',
     }
 
     manifest = {

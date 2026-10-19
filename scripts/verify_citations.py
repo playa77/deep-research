@@ -2,7 +2,10 @@
 """
 Citation Verification Script
 
-Catches fabricated citations by checking:
+Legacy citation metadata/accessibility diagnostics. These do not verify truth.
+--strict delegates to fact_check.py's complete local release contract.
+
+Heuristic diagnostics include:
 1. DOI resolution (via doi.org)
 2. Basic metadata matching (title similarity, year match)
 3. URL accessibility verification
@@ -25,6 +28,7 @@ from urllib import request, error
 from urllib.parse import quote
 import json
 import time
+import subprocess
 from datetime import datetime
 
 class CitationVerifier:
@@ -412,11 +416,22 @@ Uses free DOI resolver - no API key needed.
     args = parser.parse_args()
     report_path = Path(args.report)
 
+    if args.strict:
+        # A resolving DOI or HTTP 200 is not claim verification. Keep the old
+        # strict entry point usable, but never let it serve as a weaker gate.
+        run = report_path.resolve().parent.parent
+        if report_path.resolve() != run / 'report/report.md':
+            print(json.dumps({'status': 'blocked', 'errors': ['Strict QA requires the canonical <run>/report/report.md path.']}))
+            sys.exit(1)
+        sys.exit(subprocess.call([sys.executable, str(Path(__file__).with_name('fact_check.py')),
+                                  'verify', '--run-dir', str(run)]))
+
     if not report_path.exists():
         print(f"ERROR: Report file not found: {report_path}")
         sys.exit(1)
 
     verifier = CitationVerifier(report_path, strict_mode=args.strict)
+    print('DIAGNOSTICS ONLY: metadata/accessibility do not establish citation identity, entailment, or truth.')
     passed = verifier.verify_all()
 
     sys.exit(0 if passed else 1)

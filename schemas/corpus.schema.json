@@ -20,6 +20,11 @@
     "search_angle": { "type": ["string", "null"], "default": null },
     "discovered_by": { "type": ["string", "null"], "default": null },
     "raw_file": { "type": ["string", "null"], "default": null },
+    "retrieval_record": {
+      "type": ["string", "null"],
+      "description": "Original-response provenance JSON path relative to acquisition/. Required for release evidence.",
+      "default": null
+    },
     "registered_at": { "type": "string", "format": "date-time" },
 
     "content_hash": {

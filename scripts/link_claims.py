@@ -21,6 +21,7 @@ CLI:
 import argparse
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -60,11 +61,14 @@ def cmd_link(args: argparse.Namespace) -> None:
     unresolvable: dict[str, list[int]] = {}
 
     for claim in claims:
-        nums = claim.pop('_citation_numbers', None)
-        if claim.get('cited_source_ids'):
-            already += 1
-            continue
+        # Recompute from current text on EVERY run. Temporary fields and prior
+        # links must not hide citation drift or a reordered corpus.
+        claim.pop('_citation_numbers', None)
+        nums = [int(n.strip()) for m in re.finditer(r'\[(\d+(?:,\s*\d+)*)\]', claim['text'])
+                for n in m.group(1).split(',')]
+        previous = claim.get('cited_source_ids', [])
         if not nums:
+            claim['cited_source_ids'] = []
             no_citations += 1
             continue
         resolved = []
@@ -77,16 +81,20 @@ def cmd_link(args: argparse.Namespace) -> None:
                 missing.append(int(n))
         if missing:
             unresolvable[claim['claim_id']] = sorted(set(missing))
-        if resolved:
-            claim['cited_source_ids'] = sorted(set(resolved))
+        claim['cited_source_ids'] = sorted(set(resolved))
+        if previous != claim['cited_source_ids'] or missing:
+            claim['support_status'] = 'unverified'
+        if resolved and previous != claim['cited_source_ids']:
             linked += 1
+        elif resolved:
+            already += 1
 
     with open(claims_path, 'w', encoding='utf-8') as f:
         for claim in claims:
             f.write(json.dumps(claim, ensure_ascii=False) + '\n')
 
     print(json.dumps({
-        'status': 'ok',
+        'status': 'fail' if unresolvable else 'ok',
         'total_claims': len(claims),
         'newly_linked': linked,
         'already_linked': already,
@@ -94,6 +102,8 @@ def cmd_link(args: argparse.Namespace) -> None:
         'claims_with_unresolvable_numbers': unresolvable,
         'sources_path': sources_path,
     }, indent=2, ensure_ascii=False))
+    if unresolvable:
+        sys.exit(1)
 
 
 def main() -> None:

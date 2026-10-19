@@ -1,0 +1,2 @@
+# Free, local schema validation; no API key or hosted service.
+jsonschema==4.26.0

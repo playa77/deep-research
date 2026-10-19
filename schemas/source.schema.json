@@ -75,6 +75,11 @@
       "description": "Path of the extracted full text relative to acquisition/ (e.g. raw/a03-001.md)",
       "default": null
     },
+    "retrieval_record": {
+      "type": ["string", "null"],
+      "description": "Original-response provenance JSON path relative to acquisition/. Required for release evidence.",
+      "default": null
+    },
     "registered_at": {
       "type": "string",
       "format": "date-time",
