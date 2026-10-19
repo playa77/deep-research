@@ -1,3 +1,11 @@
+> Required provenance update: [fact-checking.md](fact-checking.md) governs
+> release. Every evidence source needs unchanged original response/document
+> bytes and a `retrieval_record` with actual tool-call reference and content
+> SHA-256, in addition to faithfully extracted raw text. Do not add key-passage
+> annotations to raw text. Missing or inaccessible content cannot be fabricated.
+> Keep credentials, authorization headers and session cookies out of artifacts.
+> All modes reserve budget for independent claim and fact-check red teaming.
+
 # Phases 1–2: Scope & Plan → Acquire
 
 Phase 1 borrows 199-biotech's scoping epistemology; phase 2 is the
@@ -25,7 +33,7 @@ methodology appendix):
 | Audience | Executive / technical / mixed |
 | Scope | Geography, timeframe, inclusions/exclusions |
 | Constraints | Banned sources, required source classes, budget limits |
-| Citation level | strict / standard (default strict) |
+| Verification | Full mandatory fact-checking contract in every mode |
 | Definition of done | Measurable completion criteria |
 
 Default assumptions when the user doesn't specify: technical query →
@@ -118,13 +126,14 @@ items. Never fabricate metadata: unknown publication date = published: null.
 Persist as you go (do not hold results in memory):
 1. For each source you actually fetch, write
    <run>/acquisition/raw/<your-id>-<NN>.md — YAML frontmatter exactly per the
-   format below, then the extracted text, marking key passages with
-   > [KEY PASSAGE] (locator) "exact quote"
+   format below, then faithfully extracted text without agent annotations.
+   Separately save original response/document bytes and a retrieval.schema.json
+   provenance record with the actual tool-call reference and content hash.
 2. Append one JSON line per source to
    <run>/acquisition/agents/<your-id>.sources.jsonl with fields:
    raw_url, title, origin (primary|secondary|tertiary), medium
    (web|academic|documentation|code|news|government|book), published,
-   retrieved, publisher, search_angle, discovered_by, raw_file
+   retrieved, publisher, search_angle, discovered_by, raw_file, retrieval_record
 3. Append one JSON line per search to
    <run>/acquisition/agents/<your-id>.queries.jsonl:
    query_text, tool, search_angle, result_count, top_urls, notes

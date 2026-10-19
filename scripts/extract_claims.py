@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """
-Atomic Claim Extractor — decomposes report sections into typed claims.
+Candidate Claim Extractor — suggests report spans for manual atomic decomposition.
+
+This parser is a drafting aid, not a coverage or semantic verification gate.
+The release contract inventories every nonblank physical report line separately.
 
 CLI subcommands:
   extract      Parse a markdown report into atomic claims (claims.jsonl)
@@ -12,10 +15,7 @@ Claim identity:
   claim_id = sha256(section_id + normalized_text)[:16]
 
 Claim types (per GPT Pro's refinement of Codex's proposal):
-  - factual: hard-fails on lack of support
-  - synthesis: needs traceability, softer threshold
-  - recommendation: needs traceability, softer threshold
-  - speculation: labeled, no support gate
+Types are provisional hints. No type or section is exempt from final review.
 """
 
 import argparse
@@ -88,23 +88,12 @@ CITATION_RE = re.compile(r'\[(\d+(?:,\s*\d+)*)\]')
 # Sentence splitting (basic but handles abbreviations)
 SENTENCE_RE = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
 
-# Sections that describe the run or render the corpus, not the topic: their
-# sentences are not claims and must not enter the support gate. Matches
-# slugs like 'methodology' and 'methodology_appendix'.
-NON_TOPIC_SECTIONS = {'bibliography', 'methodology', 'claims_evidence_table'}
-
-
-def _is_non_topic_section(section_id: str) -> bool:
-    return any(section_id == s or section_id.startswith(s + '_')
-               for s in NON_TOPIC_SECTIONS)
-
-
 def classify_claim(text: str, section_id: str) -> str:
     """Heuristic claim type classification."""
     lower = text.lower()
 
     # Recommendation indicators
-    if any(w in lower for w in ['should', 'recommend', 'suggest', 'advise', 'consider']):
+    if re.search(r'\b(should|recommend|advise|consider)\b', lower):
         if section_id == 'recommendations':
             return 'recommendation'
         return 'recommendation'
@@ -121,9 +110,7 @@ def classify_claim(text: str, section_id: str) -> str:
                 lower):
         return 'synthesis'
 
-    # Synthesis/conclusion/limitations sections carry analytical disclosures
-    # and run-level caveats, not evidence-gated topic claims.
-    if section_id in ('synthesis', 'conclusion', 'limitations'):
+    if section_id == 'synthesis' and re.match(r'^(taken together|overall)\b', lower):
         return 'synthesis'
 
     # Default: factual
@@ -158,18 +145,18 @@ def parse_sections(markdown: str) -> list[tuple[str, str]]:
 
 
 def extract_sentences(text: str) -> list[str]:
-    """Split text into sentences, filtering noise."""
+    """Conservative candidate spans; preserve short text, headings and tables."""
     # Remove markdown formatting noise
     text = re.sub(r'^[-*]\s+', '', text, flags=re.M)  # bullet points
     text = re.sub(r'\*\*([^*]+)\*\*', r'\1', text)  # bold
     text = re.sub(r'\*([^*]+)\*', r'\1', text)  # italic
 
-    sentences = SENTENCE_RE.split(text)
+    sentences = [s for line in text.splitlines() if line.strip()
+                 for s in SENTENCE_RE.split(line)]
     result = []
     for s in sentences:
         s = s.strip()
-        # Filter out very short fragments, headings, empty lines
-        if len(s) > 30 and not s.startswith('#') and not s.startswith('|'):
+        if s:
             result.append(s)
     return result
 
@@ -189,22 +176,21 @@ def cmd_extract(args: argparse.Namespace) -> None:
         markdown = f.read()
 
     claims_path = os.path.join(args.dir, 'claims.jsonl')
-    existing_ids = {r['claim_id'] for r in read_jsonl(claims_path)}
+    existing = {r['claim_id']: r for r in read_jsonl(claims_path)}
+    existing_ids = set(existing)
+    current = {}
 
     sections = parse_sections(markdown)
     added = 0
     skipped = 0
 
     for section_id, content in sections:
-        if section_id == 'preamble':
-            continue
-        if _is_non_topic_section(section_id):
-            continue
         sentences = extract_sentences(content)
         for sentence in sentences:
             claim_id = compute_claim_id(section_id, sentence)
             if claim_id in existing_ids:
                 skipped += 1
+                current[claim_id] = existing[claim_id]
                 continue
 
             # Extract citation numbers from sentence
@@ -224,15 +210,20 @@ def cmd_extract(args: argparse.Namespace) -> None:
                 'extracted_at': datetime.now(timezone.utc).isoformat(),
                 '_citation_numbers': citation_nums,  # Temporary, for linking
             }
-            append_jsonl(claims_path, claim)
-            existing_ids.add(claim_id)
+            current[claim_id] = claim
             added += 1
+
+    # Reconcile against the current report; deleted/edited spans cannot linger.
+    with open(claims_path, 'w', encoding='utf-8') as f:
+        for claim in current.values():
+            f.write(json.dumps(claim, ensure_ascii=False) + '\n')
 
     print(json.dumps({
         'status': 'ok',
         'claims_added': added,
         'claims_skipped': skipped,
-        'total_claims': len(existing_ids),
+        'total_claims': len(current),
+        'claims_removed': len(existing_ids - current.keys()),
     }))
 
 

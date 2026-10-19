@@ -15,6 +15,10 @@ never "significantly improved"), fact vs synthesis distinguished ("According
 to [1]..." vs "This suggests..."), uncertainty admitted ("No sources found
 addressing X"), speculation labeled. No placeholder text of any kind.
 
+RELEASE: follow reference/fact-checking.md. Every assertion, including tables
+and methodological claims, needs atomic coverage and independent verifier +
+red-team review. Remove this instructional comment before final review.
+
 Section names below are required by scripts/validate_report.py — keep them.
 -->
 
@@ -48,13 +52,13 @@ synthesis and consistent with the claim ledger.)
 
 ## Counterevidence Register
 
-*(Recommended section.)* The strongest counterarguments to the main findings,
+(Required for major findings.) The strongest counterarguments to the main findings,
 steelmanned, each cited to evidence. What would change our mind.
 
 ## Claims-Evidence Table
 
-*(Recommended section.)* Major claim → evidence_ids → independence groups →
-support status. The audit bridge between report and ledger.
+(Audit summary; full records are in qa/fact_check.json.) Major claim → evidence_ids → independence groups →
+verification/red-team verdicts and residual uncertainty. The audit bridge between report and ledger.
 
 ## Limitations & Caveats
 
@@ -77,4 +81,6 @@ EVERY citation used in the body, individually listed. -->
 
 (Pipeline used: mode, acquisition waves and budgets, corpus triage summary —
 discovered → selected —, evidence counts, delta-acquisition waves, validation
-results, and outline adaptations with their evidence-driven rationale.)
+results, real independent reviewer session references, limitations of the
+verification, and outline adaptations with their evidence-driven rationale.
+A contract pass checks audit requirements; it does not prove all claims true.)

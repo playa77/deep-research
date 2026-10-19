@@ -1,7 +1,7 @@
 ---
 name: deep-research
 description: Wide multi-source research with a durable evidence trail.
-version: 0.1.0
+version: 0.2.0
 author: Daniel (playa77), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -18,8 +18,9 @@ fan-out, broad fetching — derived from standardhuman/deep-research-skill) feed
 a rigorous **evidence laboratory** (claim ledger, triangulation, adversarial QA —
 derived from 199-biotechnologies/claude-deep-research-skill), joined by a
 durable on-disk **acquisition bundle** and a SOURCE TRIAGE phase. Produces
-citation-tracked reports in which every factual claim is backed by persisted
-evidence from a curated, independence-checked corpus.
+citation-tracked reports with persisted evidence, complete claim coverage, and
+separate verification and adversarial review records. A contract pass establishes
+audit completeness; it does not prove that every source or claim is true.
 
 Two properties matter more than any single step:
 
@@ -27,7 +28,23 @@ Two properties matter more than any single step:
   `acquisition/` files; all reasoning inputs come from disk. Any phase can be
   resumed by a fresh session from `run_manifest.json` + the bundle.
 - **"Did the source say X" ≠ "is X true".** Quote verification (check 1) and
-  truth verification (checks 2–7) are separate final-QA gates.
+  source-accuracy and inference review (checks 2–7) are separate final-QA gates.
+
+## Mandatory fact-checking contract
+
+Read **[reference/fact-checking.md](reference/fact-checking.md)** in full before
+planning and again before QA. It supersedes older support heuristics. Every
+mode MUST inventory every report assertion, preserve original retrievals,
+anchor exact quotations, reproduce calculations, and obtain separate verifier
+and red-team review for **every claim and every evidence link**. Review the
+fact checks themselves, not just the prose. Use actual distinct sessions and
+retain their execution references; an author simulating personas is insufficient.
+
+`fact_check.py verify --run-dir <run>` is the mandatory fail-closed release gate.
+Missing, stale, uncertain or failed checks block reviewed delivery. No type,
+heading, section, table, short statement or limitation disclosure exempts an
+assertion. Never substitute lexical similarity, a resolving DOI, a high source
+score, or a generic checklist for verification. No paid service is required.
 
 ## When to Use
 
@@ -40,7 +57,8 @@ answerable with 1–2 searches.
 
 ## Prerequisites
 
-- `python3` (stdlib only — no pip installs)
+- Python 3.10+ and pip or uv; install the free local validator dependency:
+  `python -m pip install -r <skill>/requirements.txt` (or `uv pip install -r ...`).
 - Hermes tools: `web_search`, `web_extract`, `terminal`, `write_file`,
   `read_file`, `delegate_task`, `todo_list`
 - JS-heavy or bot-walled sources: browser tooling + the `blocked-page-recovery` skill
@@ -56,13 +74,13 @@ USER QUESTION
   → 5 TRIANGULATE           (cluster-independent corroboration, contradictions,
                              counterevidence)
   → 6 SYNTHESIZE            (outline refinement, prose-first report)
-  → 7 CRITIQUE & GAP-FILL   (persona red team, delta-queries loop-back)
+  → 7 CRITIQUE & GAP-FILL   (independent critique, delta-queries loop-back)
   → 8 FINAL QA & PACKAGE    (8 checks → report/ + qa/)
 ```
 
 | Mode | Phases | Angles | ≈Searches | ≈Fetches | Corpus target | Report words |
 |---|---|---|---|---|---|---|
-| quick | 1,2,3,4,6,8 | 3–4 | 8 | 10 | 10–15 | 2,000–4,000 |
+| quick | all 8 | 3–4 | 8 | 10 | 10–15 | 2,000–4,000 |
 | standard | all 8 | 5–7 | 15 | 20 | 20–40 | 4,000–8,000 |
 | deep | all 8 | 7–10 | 25 | 35 | 40–70 | 8,000–15,000 |
 | ultradeep | all 8 | 10–14 | 40 | 60 | 60–100 | 15,000–20,000+ |
@@ -84,7 +102,9 @@ year from training data.
    angle via `delegate_task` (parallel). Agents find the evidence universe —
    they return sources, passages, and leads, **never conclusions**. Each writes
    `acquisition/agents/<id>.sources.jsonl`, `<id>.queries.jsonl`, and
-   `acquisition/raw/<id>-NN.md` (frontmatter + extracted text).
+   `acquisition/raw/<id>-NN.md` (identity frontmatter + faithful extracted text),
+   original retrieval response/document bytes, and a `retrieval_record` linking
+   tool provenance and original content hashes. See the fact-checking contract.
 4. **Merge + map**: `merge-sources --acq-dir <run>/acquisition`,
    `merge-query-log`, `build-source-map`.
 5. **Triage**: `python scripts/triage.py run --run-dir <run> --mode <mode>`.
@@ -99,13 +119,17 @@ year from training data.
    draft report progressively section-by-section to `report/report.md`
    (`templates/report_template.md`), prose-first, every factual claim cited
    `[N]` in the same sentence.
-9. **Critique & gap-fill**: persona-based critique; critical gaps → delta-queries.
-10. **Final QA** (`reference/final-qa.md`): run the 8 checks —
-    `validate_report.py`, `verify_citations.py`, `extract_claims.py` +
-    `verify_claim_support.py --strict` — plus numerical, temporal, independence,
-    counterevidence, and synthesis review. Max 3 fix cycles, then stop and report.
-11. **Package**: bibliography via `export-bibliography --dir <run>`, mark
-    phases complete in `run_manifest.json`, write `qa/qa_report.md`.
+9. **Critique & gap-fill**: independent critique; evidence gaps → delta-queries.
+   Final verifier/red-team findings may also trigger a logged delta wave.
+10. **Final QA** (`reference/final-qa.md`, `reference/fact-checking.md`):
+    finalize bibliography; validate format; prepare the complete line inventory
+    and atomic claim contract; assign separate verifier and red-team sessions
+    with the bundled prompts; review every claim, evidence link and fact check;
+    run `fact_check.py verify --run-dir <run>`. Max 3 repair cycles, then stop
+    as blocked and report unresolved findings. Failures cannot be waived.
+11. **Package**: preserve the finalized report/bibliography and current contract
+    result, mark phases complete in `run_manifest.json`, write `qa/qa_report.md`.
+    Do not rewrite the report or bibliography after its final review.
 
 Gate between phases: a phase is done only when its completion criterion in the
 matching reference file is met and its files exist on disk.
@@ -123,14 +147,17 @@ python scripts/citation_manager.py build-source-map  --acq-dir <run>/acquisition
 python scripts/triage.py run --run-dir <run> --mode deep
 # Evidence persistence (during phases 4–5)
 python scripts/evidence_store.py add --dir <run>/evidence --json '{"source_id":"...","quote":"...","evidence_type":"direct_quote","locator":"p5"}'
-# Final QA
-python scripts/validate_report.py --report <run>/report/report.md
-python scripts/verify_citations.py --report <run>/report/report.md
+# Drafting aids (not a release decision)
 python scripts/extract_claims.py extract --report <run>/report/report.md --dir <run>/evidence
 python scripts/link_claims.py link-claims --dir <run>/evidence --run-dir <run>
-python scripts/verify_claim_support.py verify --dir <run>/evidence --strict
-# Packaging
+# Finalize bibliography and put the generated output into the report
 python scripts/citation_manager.py export-bibliography --dir <run>
+# Final QA: prepare a new review snapshot
+python scripts/validate_report.py --report <run>/report/report.md
+python scripts/fact_check.py prepare --run-dir <run>
+# Complete atomic claims, full coverage, source reviews, verifier + red team
+python scripts/fact_check.py inspect --run-dir <run>
+python scripts/fact_check.py verify --run-dir <run>
 ```
 
 Schemas in `schemas/` define every JSONL row and the manifest.
@@ -145,17 +172,21 @@ Schemas in `schemas/` define every JSONL row and the manifest.
   independence groups (`independence_group_id`), never raw rows.
 - Never fabricate a citation. Write "No sources found for X" instead.
 - Don't re-search during phases 4–8; only sanctioned delta-acquisition loops
-  (steps 5, 9) may search, and they append to the same bundle.
-- Scripts are deterministic and idempotent — re-run freely after delta waves.
+  (steps 5, 9, 10) may search, and they append to the same bundle.
+- Validators are deterministic. Drafting aids can be re-run; final review
+  snapshots must be explicitly archived and renewed after substantive edits.
 - Publication dates are never guessed; `published: null` when unknown.
 
 ## Verification
 
 - `run_manifest.json.phases_completed` lists every phase; each phase's files
   exist (bundle, corpus, evidence, claims, report, qa_report).
-- `triage/triage_report.md` shows zero uncovered gaps or documented waivers.
-- `verify_claim_support.py verify --strict` exits 0 (no unsupported factual claims).
-- `validate_report.py` and `verify_citations.py` pass (max 3 fix cycles).
+- `triage/triage_report.md` shows zero uncovered gaps or documented scope limits
+  reflected in narrowed, supported report assertions.
+- `fact_check.py verify` exits 0 with the current `contract_pass` result;
+  `qa/fact_check.json` and `qa/fact_check_result.json` match the delivered bundle.
+- Every claim and evidence link has separate verifier and adversarial review.
+- `validate_report.py` passes and final synthesis is reviewed (max 3 fix cycles).
 - `qa/qa_report.md` records all 8 final checks with pass/fail each.
 
 ## References
@@ -169,3 +200,5 @@ Schemas in `schemas/` define every JSONL row and the manifest.
 - `reference/evidence-engine.md` — phases 4–5: evidence, claims, triangulation
 - `reference/synthesis.md` — phases 6–7: outline refinement, writing standards, critique
 - `reference/final-qa.md` — phase 8: the 8 checks, validation loop, packaging
+- `reference/fact-checking.md` — normative fail-closed contract and its limits
+- `templates/verification_prompt.md`, `templates/red_team_prompt.md` — independent review tasks

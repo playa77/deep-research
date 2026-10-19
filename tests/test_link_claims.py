@@ -67,7 +67,7 @@ class TestLinkClaims(unittest.TestCase):
 
     def test_links_and_flags_unresolvable(self):
         rc, out = run_link('link-claims', '--dir', self.ev, '--sources', self.corpus_path)
-        self.assertEqual(rc, 0)
+        self.assertEqual(rc, 1)  # Unresolved citation remains a hard failure on every run
         self.assertEqual(out['newly_linked'], 2)  # c1, c2 (c4 has only unresolvable)
         self.assertEqual(out['already_linked'], 0)
         self.assertEqual(out['no_citations_in_text'], 1)
@@ -85,9 +85,28 @@ class TestLinkClaims(unittest.TestCase):
     def test_idempotent(self):
         run_link('link-claims', '--dir', self.ev, '--sources', self.corpus_path)
         rc, out = run_link('link-claims', '--dir', self.ev, '--sources', self.corpus_path)
-        self.assertEqual(rc, 0)
+        self.assertEqual(rc, 1)  # Unresolved citation remains a hard failure on every run
         self.assertEqual(out['already_linked'], 2)
         self.assertEqual(out['newly_linked'], 0)
+
+    def test_reordered_corpus_relinks_existing_citations(self):
+        run_link('link-claims', '--dir', self.ev, '--sources', self.corpus_path)
+        with open(self.corpus_path) as f:
+            corpus = [json.loads(line) for line in f if line.strip()]
+        with open(self.corpus_path, 'w') as f:
+            for row in reversed(corpus):
+                f.write(json.dumps(row) + '\n')
+        run_link('link-claims', '--dir', self.ev, '--sources', self.corpus_path)
+        with open(os.path.join(self.ev, 'claims.jsonl')) as f:
+            claims = {c['claim_id']: c for c in map(json.loads, f)}
+        self.assertEqual(claims['c1']['cited_source_ids'], [self.sid_b])
+        self.assertEqual(claims['c1']['support_status'], 'unverified')
+
+    def test_unresolved_citation_cannot_disappear_on_rerun(self):
+        first_rc, first = run_link('link-claims', '--dir', self.ev, '--sources', self.corpus_path)
+        second_rc, second = run_link('link-claims', '--dir', self.ev, '--sources', self.corpus_path)
+        self.assertEqual((first_rc, second_rc), (1, 1))
+        self.assertEqual(first['claims_with_unresolvable_numbers'], second['claims_with_unresolvable_numbers'])
 
     def test_requires_run_dir_or_sources(self):
         proc = subprocess.run([sys.executable, SCRIPT, 'link-claims', '--dir', self.ev],

@@ -46,6 +46,11 @@ order and contracts per `templates/report_template.md`:
 
 ### 6.4 Per-section claim loop
 
+The normative [fact-checking contract](fact-checking.md) applies to every
+assertion. These scripts generate candidates and diagnostics only; they do
+not establish atomic coverage, entailment or truth. A fact in a limitation,
+recommendation, conclusion, table, short sentence or heading is still a fact.
+
 After each section: link, extract, and support-check the growing report, and
 fix drift immediately rather than at the end:
 
@@ -57,16 +62,20 @@ python scripts/verify_claim_support.py verify --dir <run>/evidence
 
 `link_claims.py` resolves each claim's `[N]` display numbers to stable
 source_ids via the curated corpus — the bridge between report citations and
-the evidence store. Factual claims that come back `unsupported` are either
-backed (add evidence rows + citations) or rewritten — they never ship.
-`needs_review` flags low lexical overlap: confirm the evidence genuinely
-supports the claim, or soften the sentence.
+the evidence store. All candidate claims remain unverified until the separate verifier and red
+team complete the final atomic-claim contract. Lexical overlap never assigns
+semantic support. Fix unsupported assertions; softening alone does not supply
+missing evidence. Final reviews bind to the current report and evidence snapshot.
 
 ## Phase 7: CRITIQUE & GAP-FILL
 
-### 7.1 Persona critique (deep/ultradeep; one general critique pass in standard)
+### 7.1 Independent adversarial verification (every mode)
 
-Simulate critics relevant to the topic and let each attack the draft:
+Assign a verifier and red-team reviewer in separate actual sessions, following
+`templates/verification_prompt.md` and `templates/red_team_prompt.md`. Require
+source-specific review for every claim, every evidence link and every fact
+check. An author role-playing a critic cannot satisfy this requirement.
+Additional topic-specific perspectives can help:
 
 - **Skeptical Practitioner** — would someone doing this work daily trust
   these findings? What's missing from their vantage?
@@ -86,7 +95,8 @@ gaps. Evidence gaps get delta-queries — a time-boxed, targeted acquisition
 wave (a few `delegate_task` agents, same acquisition contract, small budgets)
 whose output merges into the bundle and re-runs triage; then update the
 affected sections from the new evidence. This is the only sanctioned search
-in phases 6–8. If a gap cannot be closed, it is disclosed in Limitations.
+in phases 6–8. If a gap cannot be closed, remove or narrow the affected assertion, or retain
+a blocked/unverified draft. A disclosure does not waive a failed fact check.
 
 **Gate (phases 6–7 complete)**: report structurally complete per the
 template; per-section claim check passing; every critique finding either

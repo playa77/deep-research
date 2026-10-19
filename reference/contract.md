@@ -7,6 +7,12 @@ replaced without touching the other.
 
 > **Search is disposable; evidence is durable.**
 
+The release contract in [fact-checking.md](fact-checking.md) is normative and
+supersedes any older QA shortcuts. Every evidence source must additionally
+preserve original retrieval response bytes and a `retrieval_record` conforming
+to `schemas/retrieval.schema.json`. Original bytes, extracted text and their
+provenance records are separate artifacts, bound to final reviews by hashes.
+
 ## The bundle
 
 Produced by phase 2 (ACQUIRE), consumed by phases 3–8. Created by
@@ -21,6 +27,8 @@ Produced by phase 2 (ACQUIRE), consumed by phases 3–8. Created by
     sources.jsonl              # merged source registry (schemas/source.schema.json)
     leads.jsonl                # promising leads acquisition surfaced but did not chase
     source_map.json            # generated index: angle→sources, raw file→source, agent stats
+    original/                  # unchanged HTTP/tool response or document bytes
+    retrieval/                 # retrieval.schema.json records with content hashes
     raw/
       a03-001.md               # one file per fetched source
       a03-002.md               #   <agent>-<NN>.md — agent owns its prefix
@@ -38,12 +46,14 @@ Produced by phase 2 (ACQUIRE), consumed by phases 3–8. Created by
     report.md
   qa/
     qa_report.md
+    fact_check.json            # atomic claims, full coverage, source + claim reviews
+    fact_check_result.json     # current mechanical release decision and hashes
 ```
 
 ## Raw source file format
 
 Every fetched source becomes one markdown file: YAML frontmatter (identity)
-followed by the extracted text with key passages marked. The frontmatter is
+followed by faithfully extracted text. Keep annotations in separate files. The frontmatter is
 generated from the agent's source row — fields match
 `schemas/source.schema.json`.
 
@@ -60,12 +70,12 @@ medium: government
 search_angle: french-government-records
 discovered_by: acquisition-agent-07
 metadata_status: url_verified
+retrieval_record: retrieval/a07-001.json
 ---
 
 <extracted text>
 
-> [KEY PASSAGE] (section 3, p. 42) "Le budget de la recherche a diminué
-> de 4,2 % en termes réels entre 2019 et 2023."
+Le budget de la recherche a diminué de 4,2 % en termes réels entre 2019 et 2023.
 ```
 
 Rules:
@@ -76,8 +86,8 @@ Rules:
   filings, first reporting), `secondary` (analysis of primary material),
   `tertiary` (aggregations, encyclopedias). This drives triage priority.
 - `published` is the actual publication date or `null`. Never guessed.
-- Mark key passages with `> [KEY PASSAGE] (locator) "exact quote"` — these are
-  the spans phase 4 promotes into `evidence.jsonl`.
+- Store key-passage annotations separately from raw text. Evidence quotes must
+  be exact spans in the actual extracted source body, with real locators.
 - Extracted text only. No agent commentary, no argument, no conclusion.
 
 ## The agent contract
@@ -88,6 +98,8 @@ output rows are exactly:
 **`<id>.sources.jsonl`** — one row per fetched source, with at minimum
 `raw_url`, `title`, `origin`, `medium`; ideally all source fields including
 `search_angle`, `discovered_by`, `raw_file`, `retrieved`, `published`.
+Evidence sources MUST also have `retrieval_record` and the original response
+bytes, per the fact-checking contract. Missing provenance blocks release.
 
 **`<id>.queries.jsonl`** — one row per search executed: `query_text`, `tool`,
 `search_angle`, `result_count`, `top_urls`, `notes` (dead ends, rate limits,
@@ -139,7 +151,8 @@ ever reads `agents/` fragments again.
 See `schemas/corpus.schema.json` and `reference/triage.md`.
 
 The evidence engine reads **only**: `triage/corpus.jsonl`,
-`acquisition/raw/*.md` for selected/reserve sources, `acquisition/query_plan.md`
+`acquisition/raw/*.md` and original response/document bytes plus retrieval
+records for selected/reserve sources, `acquisition/query_plan.md`
 (for scope), and `run_manifest.json` (for contract + hypotheses). It must not
 re-search the web; the only sanctioned search loops are delta-acquisition
 waves triggered by triage gaps or critique findings, and their output enters

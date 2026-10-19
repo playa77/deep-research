@@ -1,0 +1,807 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Fact checking release contract",
+  "type": "object",
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "inputs": {
+      "type": "object",
+      "minProperties": 5,
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "author_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-]+$",
+      "minLength": 1
+    },
+    "reviewers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "reviewer_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "minLength": 1
+          },
+          "role": {
+            "enum": [
+              "author",
+              "verifier",
+              "red_team"
+            ]
+          },
+          "identity": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "execution_ref": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          }
+        },
+        "required": [
+          "reviewer_id",
+          "role",
+          "identity",
+          "execution_ref"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 3,
+      "uniqueItems": true
+    },
+    "coverage": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "line": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "text_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "kind": {
+            "enum": [
+              "pending",
+              "claims",
+              "non_assertive"
+            ]
+          },
+          "claim_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "line",
+          "text_sha256",
+          "kind",
+          "claim_ids",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "coverage_review": {
+      "type": "object",
+      "properties": {
+        "reviewer_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]+$",
+          "minLength": 1
+        },
+        "inputs_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "verdict": {
+          "enum": [
+            "pending",
+            "approved",
+            "rejected",
+            "uncertain"
+          ]
+        },
+        "checks": {
+          "type": "object",
+          "properties": {
+            "all_content": {
+              "$ref": "#/$defs/check"
+            },
+            "atomic_decomposition": {
+              "$ref": "#/$defs/check"
+            },
+            "non_assertive_exclusions": {
+              "$ref": "#/$defs/check"
+            },
+            "bibliography_mapping": {
+              "$ref": "#/$defs/check"
+            }
+          },
+          "required": [
+            "all_content",
+            "atomic_decomposition",
+            "non_assertive_exclusions",
+            "bibliography_mapping"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "reviewer_id",
+        "inputs_sha256",
+        "verdict",
+        "checks"
+      ],
+      "additionalProperties": false
+    },
+    "anchors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "evidence_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{16}$"
+          },
+          "raw_file": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "raw_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "start": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "evidence_id",
+          "raw_file",
+          "raw_sha256",
+          "start",
+          "end"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "source_reviews": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "source_id": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{16}$"
+          },
+          "reviewer_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "minLength": 1
+          },
+          "inputs_sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          },
+          "verdict": {
+            "enum": [
+              "pending",
+              "approved",
+              "rejected",
+              "uncertain"
+            ]
+          },
+          "origin_key": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "checks": {
+            "type": "object",
+            "properties": {
+              "retrieval_authenticity": {
+                "$ref": "#/$defs/check"
+              },
+              "metadata_identity": {
+                "$ref": "#/$defs/check"
+              },
+              "full_context": {
+                "$ref": "#/$defs/check"
+              },
+              "corrections_retractions": {
+                "$ref": "#/$defs/check"
+              },
+              "fitness_for_claim": {
+                "$ref": "#/$defs/check"
+              },
+              "origin_lineage": {
+                "$ref": "#/$defs/check"
+              }
+            },
+            "required": [
+              "retrieval_authenticity",
+              "metadata_identity",
+              "full_context",
+              "corrections_retractions",
+              "fitness_for_claim",
+              "origin_lineage"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "source_id",
+          "reviewer_id",
+          "inputs_sha256",
+          "verdict",
+          "origin_key",
+          "checks"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 0,
+      "uniqueItems": true
+    },
+    "claims": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "claim_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "minLength": 1
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "\\S"
+          },
+          "locations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "line": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "excerpt": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                }
+              },
+              "required": [
+                "line",
+                "excerpt"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "kind": {
+            "enum": [
+              "factual",
+              "attribution",
+              "inference",
+              "recommendation",
+              "speculation",
+              "run_metadata"
+            ]
+          },
+          "importance": {
+            "enum": [
+              "minor",
+              "major"
+            ]
+          },
+          "as_of": {
+            "type": "string",
+            "format": "date"
+          },
+          "qualification": {
+            "type": "string"
+          },
+          "evidence_links": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "evidence_id": {
+                  "type": "string",
+                  "pattern": "^[0-9a-f]{16}$"
+                },
+                "relation": {
+                  "enum": [
+                    "supports",
+                    "contradicts",
+                    "context"
+                  ]
+                },
+                "rationale": {
+                  "type": "string",
+                  "minLength": 12,
+                  "pattern": "\\S"
+                }
+              },
+              "required": [
+                "evidence_id",
+                "relation",
+                "rationale"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "premise_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "minLength": 1
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "countersearch_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "counterevidence": {
+            "type": "string",
+            "minLength": 12,
+            "pattern": "\\S"
+          },
+          "calculations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "operation": {
+                  "enum": [
+                    "sum",
+                    "difference",
+                    "product",
+                    "ratio",
+                    "percentage",
+                    "percent_change",
+                    "elapsed_days",
+                    "completed_years"
+                  ]
+                },
+                "inputs": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "evidence_id": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{16}$"
+                      },
+                      "token": {
+                        "type": "string",
+                        "minLength": 1,
+                        "pattern": "\\S"
+                      },
+                      "scale": {
+                        "enum": [
+                          "one",
+                          "thousand",
+                          "million",
+                          "billion",
+                          "trillion"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "evidence_id",
+                      "token",
+                      "scale"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "minItems": 1,
+                  "uniqueItems": true
+                },
+                "decimal_places": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 12
+                },
+                "rounding": {
+                  "enum": [
+                    "half_even",
+                    "half_up"
+                  ]
+                },
+                "reported_value": {
+                  "type": "string",
+                  "pattern": "^[+-]?\\d+(?:\\.\\d+)?$",
+                  "maxLength": 100
+                },
+                "rendered": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "unit": {
+                  "type": "string",
+                  "minLength": 1,
+                  "pattern": "\\S"
+                },
+                "rationale": {
+                  "type": "string",
+                  "minLength": 12,
+                  "pattern": "\\S"
+                }
+              },
+              "required": [
+                "operation",
+                "inputs",
+                "decimal_places",
+                "rounding",
+                "reported_value",
+                "rendered",
+                "unit",
+                "rationale"
+              ],
+              "additionalProperties": false
+            },
+            "minItems": 0,
+            "uniqueItems": true
+          },
+          "verification": {
+            "type": "object",
+            "properties": {
+              "reviewer_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1
+              },
+              "claim_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "inputs_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "verdict": {
+                "enum": [
+                  "pending",
+                  "approved",
+                  "rejected",
+                  "uncertain"
+                ]
+              },
+              "checks": {
+                "type": "object",
+                "properties": {
+                  "atomicity": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "entailment": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "entities_roles": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "polarity_modality": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "numbers_units_denominators": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "time_geography_population": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "causality_comparisons": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "source_quality": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "independence": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "counterevidence": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "uncertainty": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "calculations": {
+                    "$ref": "#/$defs/check"
+                  }
+                },
+                "required": [
+                  "atomicity",
+                  "entailment",
+                  "entities_roles",
+                  "polarity_modality",
+                  "numbers_units_denominators",
+                  "time_geography_population",
+                  "causality_comparisons",
+                  "source_quality",
+                  "independence",
+                  "counterevidence",
+                  "uncertainty",
+                  "calculations"
+                ],
+                "additionalProperties": false
+              },
+              "link_reviews": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "evidence_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    },
+                    "relation": {
+                      "enum": [
+                        "supports",
+                        "contradicts",
+                        "context"
+                      ]
+                    },
+                    "verdict": {
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rejected",
+                        "uncertain"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 12,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "required": [
+                    "evidence_id",
+                    "relation",
+                    "verdict",
+                    "rationale"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "reviewer_id",
+              "claim_sha256",
+              "inputs_sha256",
+              "verdict",
+              "checks",
+              "link_reviews"
+            ],
+            "additionalProperties": false
+          },
+          "red_team": {
+            "type": "object",
+            "properties": {
+              "reviewer_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_-]+$",
+                "minLength": 1
+              },
+              "claim_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "inputs_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "verdict": {
+                "enum": [
+                  "pending",
+                  "approved",
+                  "rejected",
+                  "uncertain"
+                ]
+              },
+              "checks": {
+                "type": "object",
+                "properties": {
+                  "omitted_claims": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "citation_laundering": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "negation_role_reversal": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "wrong_number_unit_denominator": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "stale_or_wrong_scope": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "correlation_to_causation": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "shared_origin": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "cherry_picking": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "strongest_counterexample": {
+                    "$ref": "#/$defs/check"
+                  },
+                  "calculation_reproduction": {
+                    "$ref": "#/$defs/check"
+                  }
+                },
+                "required": [
+                  "omitted_claims",
+                  "citation_laundering",
+                  "negation_role_reversal",
+                  "wrong_number_unit_denominator",
+                  "stale_or_wrong_scope",
+                  "correlation_to_causation",
+                  "shared_origin",
+                  "cherry_picking",
+                  "strongest_counterexample",
+                  "calculation_reproduction"
+                ],
+                "additionalProperties": false
+              },
+              "link_reviews": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "evidence_id": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{16}$"
+                    },
+                    "relation": {
+                      "enum": [
+                        "supports",
+                        "contradicts",
+                        "context"
+                      ]
+                    },
+                    "verdict": {
+                      "enum": [
+                        "pending",
+                        "approved",
+                        "rejected",
+                        "uncertain"
+                      ]
+                    },
+                    "rationale": {
+                      "type": "string",
+                      "minLength": 12,
+                      "pattern": "\\S"
+                    }
+                  },
+                  "required": [
+                    "evidence_id",
+                    "relation",
+                    "verdict",
+                    "rationale"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 0,
+                "uniqueItems": true
+              }
+            },
+            "required": [
+              "reviewer_id",
+              "claim_sha256",
+              "inputs_sha256",
+              "verdict",
+              "checks",
+              "link_reviews"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "claim_id",
+          "text",
+          "locations",
+          "kind",
+          "importance",
+          "as_of",
+          "qualification",
+          "evidence_links",
+          "premise_ids",
+          "countersearch_ids",
+          "counterevidence",
+          "calculations",
+          "verification",
+          "red_team"
+        ],
+        "additionalProperties": false
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "version",
+    "inputs",
+    "author_id",
+    "reviewers",
+    "coverage",
+    "coverage_review",
+    "anchors",
+    "source_reviews",
+    "claims"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "check": {
+      "type": "object",
+      "properties": {
+        "result": {
+          "enum": [
+            "pending",
+            "pass",
+            "fail"
+          ]
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 12,
+          "pattern": "\\S"
+        }
+      },
+      "required": [
+        "result",
+        "rationale"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

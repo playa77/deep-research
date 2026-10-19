@@ -1,10 +1,15 @@
 # Phases 4–5: Evidence Engine
 
-The 199-biotech laboratory. Input: `triage/corpus.jsonl` + raw files for
-selected/reserve sources + the query plan + manifest hypotheses. If you find
+The 199-biotech laboratory. Input: `triage/corpus.jsonl`, faithful raw extracts, original documents/tool
+responses and retrieval records for selected/reserve sources, plus the query
+plan and manifest hypotheses. If you find
 yourself wanting to search the web here, stop — only the sanctioned
 delta-acquisition loops (phase 3 gaps, phase 7 critique) may search, and their
 output re-enters the bundle through triage.
+
+The mandatory release rules are in [fact-checking.md](fact-checking.md).
+They apply to every mode and every claim type. Drafting ledgers are provisional;
+final atomic claims and reviews live in `qa/fact_check.json`.
 
 ## Phase 4: EVIDENCE — persistence
 
@@ -36,8 +41,8 @@ Discipline:
   reconstruct from memory. Paraphrases are labeled `paraphrase`.
 - `locator` is mandatory in practice (page, section heading, table, timestamp).
   An evidence row without a locator cannot be re-checked and fails QA check 1.
-- Key passages already marked `> [KEY PASSAGE]` in raw files promote directly
-  into evidence rows.
+- Key-passage annotations never count as original source text. Verify exact
+  offsets in the extracted body against the original response/document.
 - Claim-relevant numbers get `data_point` rows with the exact figure, unit,
   timeframe, and geography in the quote or locator — phase 8's numerical and
   temporal checks run against these rows.
@@ -75,8 +80,9 @@ three acquisitions" is two claims.
 
 Count corroboration in independence groups, never rows. A major (report-grade)
 claim needs sources spanning ≥3 distinct `independence_group_id`s in
-standard/deep/ultradeep, ≥2 in quick. Single-origin claims are allowed only
-when flagged: "only one origin source exists; high uncertainty."
+standard/deep/ultradeep, ≥2 in quick. A single-origin assertion may only be reported as an explicitly attributed
+source statement, or as an inconclusive inference with reviewed premises,
+under the normative release contract. A limitation flag cannot waive support.
 
 ### 5.3 Contradiction classification
 
@@ -84,7 +90,7 @@ When evidence conflicts, classify before resolving:
 
 | Conflict type | Resolution method |
 |---|---|
-| Data disagreement | Numbers differ → find the primary source; prefer the most recent primary; otherwise report the range with dates |
+| Data disagreement | Find the primary records; compare definitions, populations, methods and windows; explain discrepancies with evidence or disclose unresolved uncertainty |
 | Interpretation disagreement | Conclusions differ → present both with evidence strength; do not pick a winner silently |
 | Methodological disagreement | Methods differ → weigh by credibility score and study design; disclose the weighting |
 | Paradigm conflict | Assumptions differ → unresolved; present both framings; note it as a limitation |
@@ -104,6 +110,6 @@ sections. Update hypothesis statuses in `run_manifest.json`
 
 **Gate (phases 4–5 complete)**: `evidence.jsonl` covers the selected corpus's
 load-bearing material; every major claim registered with cited source_ids +
-evidence_ids and meets the group-count rule or is flagged single-origin;
+evidence_ids and meets the group-count rule or is narrowed to a reviewed attributed statement;
 every contradiction classified and dispositioned; counterevidence register
 drafted; hypothesis statuses updated.

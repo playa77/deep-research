@@ -68,7 +68,7 @@ class TestVerifySupported(unittest.TestCase):
 
     def test_supported_claim(self):
         out = run_vcs('verify', '--dir', self.tmpdir)
-        self.assertEqual(out['status'], 'pass')
+        self.assertEqual(out['status'], 'diagnostic_only')
         self.assertEqual(out['factual_unsupported'], 0)
 
         # Check updated claims file
@@ -76,7 +76,7 @@ class TestVerifySupported(unittest.TestCase):
         with open(os.path.join(self.tmpdir, 'claims.jsonl')) as f:
             for line in f:
                 claims.append(json.loads(line))
-        self.assertEqual(claims[0]['support_status'], 'supported')
+        self.assertEqual(claims[0]['support_status'], 'needs_review')
 
 
 class TestVerifyUnsupported(unittest.TestCase):
@@ -104,11 +104,11 @@ class TestVerifyUnsupported(unittest.TestCase):
     def test_unsupported_no_evidence(self):
         out = run_vcs('verify', '--dir', self.tmpdir)
         self.assertEqual(out['factual_unsupported'], 1)
-        self.assertEqual(out['status'], 'pass')  # Non-strict by default
+        self.assertEqual(out['status'], 'diagnostic_only')  # Diagnostics cannot approve release
 
     def test_strict_fails(self):
         out = run_vcs('verify', '--dir', self.tmpdir, '--strict', expect_fail=True)
-        self.assertEqual(out['status'], 'fail')
+        self.assertEqual(out['status'], 'blocked')
 
 
 class TestVerifyMixed(unittest.TestCase):
@@ -144,13 +144,13 @@ class TestVerifyMixed(unittest.TestCase):
 
     def test_speculation_passes(self):
         out = run_vcs('verify', '--dir', self.tmpdir)
-        # Speculation doesn't need evidence
+        # Speculation cannot receive an automatic approval
         claims = []
         with open(os.path.join(self.tmpdir, 'claims.jsonl')) as f:
             for line in f:
                 claims.append(json.loads(line))
         spec = [c for c in claims if c['claim_type'] == 'speculation'][0]
-        self.assertEqual(spec['support_status'], 'supported')
+        self.assertEqual(spec['support_status'], 'unsupported')
 
 
 class TestVerifyPartial(unittest.TestCase):
@@ -192,7 +192,7 @@ class TestVerifyPartial(unittest.TestCase):
             for line in f:
                 claims.append(json.loads(line))
         # Should be partial or needs_review (not fully supported due to number/detail mismatch)
-        self.assertIn(claims[0]['support_status'], ('partial', 'needs_review', 'supported'))
+        self.assertEqual(claims[0]['support_status'], 'needs_review')
 
 
 class TestSupportScore(unittest.TestCase):
@@ -209,7 +209,7 @@ class TestSupportScore(unittest.TestCase):
             'RSA-2048 uses 2048-bit keys for encryption.',
             ['RSA-2048 uses 2048-bit keys for encryption.'],
         )
-        self.assertEqual(status, 'supported')
+        self.assertEqual(status, 'needs_review')
         self.assertGreater(score, 0.8)
 
     def test_no_evidence(self):
