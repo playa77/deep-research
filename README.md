@@ -5,6 +5,29 @@ source triage and a **fail-closed fact-checking release contract**. No paid
 verification API, hosted service or additional model subscription is required.
 Use the available search tools and models; Python validation runs locally.
 
+## Acquisition quality and source retention
+
+The search-quality gate runs before handoff, again on resume and during final
+verification. Every search preserves its actual execution and original response.
+Zero-result searches need successful known-item controls on the same search
+route and scope. Failed/inconclusive executions remain visible and cannot
+satisfy countersearch requirements. Planned indispensable native routes must
+work before handoff. Retries survive query-log merging.
+
+Triage treats matching titles/slugs as review leads. Full source bodies are
+compared without the old 8,000-character truncation; only exact substantive
+copies are removed. Reviewed common origins constrain corroboration while
+retaining nonidentical documents. The single triage delta wave must be reserved
+on disk before dispatch. See [search quality](reference/search-quality.md) and
+[triage](reference/triage.md). The [rework audit](reference/acquisition-quality-audit.md)
+records direct before/after reproductions and the limits of these checks.
+
+Handoff snapshot version 2 binds these search artifacts and the workflow
+fingerprint. Older runs need actual provenance recovered and an explicit
+archived-snapshot migration; missing controls cannot be invented. This release
+changes the acquisition contract; reinstall the updated skill before starting
+or resuming research.
+
 ## Two tasks, optional two sessions
 
 The skill keeps its two original research workflows separate:

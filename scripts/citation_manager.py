@@ -343,7 +343,13 @@ def cmd_merge_query_log(args: argparse.Namespace) -> None:
     agents_dir = os.path.join(acq_dir, 'agents')
 
     existing = read_jsonl(log_path)
-    seen = {(r.get('agent'), r.get('query_text'), r.get('tool')) for r in existing}
+    def execution_key(row):
+        # A retry is new work even when query text and agent are unchanged.
+        if row.get('execution_ref'):
+            return ('execution', row['execution_ref'])
+        return ('legacy', row.get('agent'), row.get('query_text'), row.get('tool'))
+
+    seen = {execution_key(r): r for r in existing}
     added = 0
     skipped = 0
 
@@ -352,18 +358,22 @@ def cmd_merge_query_log(args: argparse.Namespace) -> None:
         for row in read_jsonl(frag):
             q = dict(row)
             q.setdefault('agent', agent)
-            key = (q.get('agent'), q.get('query_text'), q.get('tool'))
+            key = execution_key(q)
             if key in seen:
+                if q.get('execution_ref') and any(seen[key].get(k) != v for k, v in q.items()):
+                    raise ValueError('conflicting records for search execution: ' + q['execution_ref'])
                 skipped += 1
                 continue
+            if q.get('execution_ref') and not q.get('ts'):
+                raise ValueError('record the actual search execution timestamp before merging')
             if not q.get('query_id'):
                 q['query_id'] = 'q_' + hashlib.sha1(
-                    f"{q.get('agent')}|{q.get('query_text')}|{q.get('tool')}".encode()
+                    repr(key).encode()
                 ).hexdigest()[:10]
             if not q.get('ts'):
                 q['ts'] = now_iso()
             append_jsonl(log_path, q)
-            seen.add(key)
+            seen[key] = q
             added += 1
 
     print(json.dumps({

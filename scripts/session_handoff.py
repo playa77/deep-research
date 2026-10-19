@@ -14,6 +14,7 @@ import sys
 import tempfile
 
 from citation_manager import compute_source_id, FRONTMATTER_RE
+from search_quality import check_acquisition
 from fact_check import (ContractError, digest, inside, load_json, load_rows, parse_json,
                         output_path, sha, validate_schema)
 
@@ -47,8 +48,9 @@ def snapshot(run):
     plan = inside(run, paths['query_plan']).read_text(encoding='utf-8')
     require(plan.strip(), 'query plan is empty')
     plans = [parse_json(block) for block in re.findall(r'```json\s*\n(.*?)```', plan, re.DOTALL)]
-    require(any(isinstance(item, dict) and isinstance(item.get('angles'), list) and
-                item['angles'] for item in plans), 'query plan needs its machine-readable angles block')
+    angle_plans = [item['angles'] for item in plans if isinstance(item, dict) and
+                   isinstance(item.get('angles'), list) and item['angles']]
+    require(len(angle_plans) == 1, 'query plan needs exactly one nonempty machine-readable angles block')
     source_map = load_json(inside(run, 'acquisition/source_map.json'))
     sources = load_rows(inside(run, paths['sources']))
     queries = load_rows(inside(run, paths['query_log']))
@@ -59,8 +61,8 @@ def snapshot(run):
             and totals.get('queries') == len(queries),
             'source map is stale; rebuild it after merging')
     ids = set()
-    for query in queries:
-        validate_schema(query, 'query_log.schema.json')
+    quality = check_acquisition(run, queries, angle_plans[0])
+    files.update(quality['response_files'])
     for source in sources:
         validate_schema(source, 'source.schema.json')
         sid = source['source_id']
@@ -93,7 +95,12 @@ def snapshot(run):
             require(path.is_relative_to((run / 'acquisition').resolve()),
                     f'artifact escapes acquisition directory: {relative}')
         inputs[relative] = sha(path.read_bytes())
-    return manifest, {'version': 1, 'inputs': inputs,
+    workflow = {str(p.relative_to(ROOT)): sha(p.read_bytes())
+                for folder in ('scripts', 'schemas', 'reference', 'templates')
+                for p in sorted((ROOT / folder).glob('*')) if p.is_file()}
+    workflow['SKILL.md'] = sha((ROOT / 'SKILL.md').read_bytes())
+    return manifest, {'version': 2, 'inputs': inputs, 'workflow_sha256': digest(workflow),
+                      'search_quality': quality,
                       'source_count': len(sources), 'query_count': len(queries)}
 
 
@@ -128,7 +135,8 @@ def prepare(run):
                                       'snapshot': SNAPSHOT, 'prompt': PROMPT}
     write_json(output_path(run, 'run_manifest.json'), manifest)
     return {'status': 'awaiting_user', 'next_phase': 'triage', 'prompt': str(prompt_path),
-            'source_count': saved['source_count'], 'query_count': saved['query_count']}
+            'source_count': saved['source_count'], 'query_count': saved['query_count'],
+            'search_quality': saved['search_quality']}
 
 
 def check(run):

@@ -36,6 +36,11 @@ class ContractError(ValueError):
     pass
 
 
+def require(condition, message):
+    if not condition:
+        raise ContractError(message)
+
+
 def sha(data):
     return hashlib.sha256(data).hexdigest()
 
@@ -162,6 +167,16 @@ def bundle(run):
         record = load_json(paths[record_path])
         original = 'acquisition/' + record['content_file']
         paths[original] = inside(run, original)
+    from search_quality import assess_queries
+    quality = assess_queries(run, load_rows(paths['acquisition/query_log.jsonl']))
+    for relative in quality['response_files']:
+        paths[relative] = inside(run, relative)
+    if (run / 'triage/lineage.json').exists():
+        paths['triage/lineage.json'] = inside(run, 'triage/lineage.json')
+        for source in sources.values():
+            if source.get('raw_file'):
+                relative = 'acquisition/' + source['raw_file']
+                paths[relative] = inside(run, relative)
     inputs = {p: sha(file.read_bytes()) for p, file in sorted(paths.items())}
     acquisition_root = (run / 'acquisition').resolve()
     for relative, path in paths.items():
@@ -438,7 +453,10 @@ def verify(run, doc):
     for q in query_rows:
         validate_schema(q, 'query_log.schema.json')
         require(bool(q['query_text'].strip()) and bool(q['tool'].strip()), 'empty search query/tool')
-    queries = {digest(q) for q in query_rows}
+    from search_quality import assess_queries
+    quality = assess_queries(run, query_rows)
+    usable = set(quality['usable_query_ids'])
+    queries = {digest(q) for q in query_rows if q['query_id'] in usable}
     # The display map must agree with the rendered bibliography, not just corpus order.
     eligible = [s for s in sources.values() if s.get('triage_status') != 'dropped']
     display = {n: s for n, s in enumerate(eligible, 1)}
@@ -532,12 +550,13 @@ def verify(run, doc):
             for a, b in combinations(sorted(supporting), 2):
                 sa, sb = sources[a], sources[b]
                 if (keys_for(a) & keys_for(b) or sa.get('duplicate_of') == b or sb.get('duplicate_of') == a
+                        or b in (sa.get('lineage_with') or []) or a in (sb.get('lineage_with') or [])
                         or b in (sa.get('syndication_with') or []) or a in (sb.get('syndication_with') or [])):
                     parents[find(a)] = find(b)
             needed = 2 if manifest['mode'] == 'quick' else 3
             require(len({find(s) for s in supporting}) >= needed, f'{cid}: fewer than {needed} independent origins')
         require(bool(c['countersearch_ids']) and set(c['countersearch_ids']) <= queries,
-                f'{cid}: missing/unknown countersearch log references')
+                f'{cid}: missing/unknown or unusable countersearch log references')
         nums = set()
         for loc in c['locations']:
             for match in re.finditer(r'\[(\d+(?:,\s*\d+)*)\]', loc['excerpt']):

@@ -43,6 +43,8 @@ Produced by phase 2 (ACQUIRE), consumed by phases 3–8. Created by
     triage_result.json         # current coverage status, capacity and next actions
     corpus.jsonl               # THE curated corpus (schemas/corpus.schema.json)
     overrides.json             # optional manual independence-group assignments
+    lineage.json               # optional hash-bound pairwise source-origin review
+    delta_attempt.json         # exclusive reservation of the single triage wave
   evidence/
     evidence.jsonl             # append-only evidence rows (schemas/evidence.schema.json)
     claims.jsonl               # atomic claim ledger (schemas/claim.schema.json)
@@ -106,8 +108,14 @@ Evidence sources MUST also have `retrieval_record` and the original response
 bytes, per the fact-checking contract. Missing provenance blocks release.
 
 **`<id>.queries.jsonl`** — one row per search executed: `query_text`, `tool`,
-`search_angle`, `result_count`, `top_urls`, `notes` (dead ends, rate limits,
-hostile pages).
+`search_angle`, `result_count`, `top_urls`, `notes`, actual `ts`, `execution_ref`,
+`outcome`, `query_role`, `search_surface`, `search_scope`, `search_session`,
+`response_file`, `response_sha256`. Save each original search response, including
+failed executions and controls. For `no_results`, supply `control_query_id`;
+positive controls require `expected_match`; failed outcomes require `limitation`.
+See [search-quality.md](search-quality.md) and the query-log schema. Repeated
+query text from a distinct execution is preserved; merging is idempotent for
+the same execution and rejects conflicting descriptions of it.
 
 **`acquisition/raw/<id>-NN.md`** — the extracted source files.
 
@@ -171,7 +179,10 @@ reserve/dropped totals, the configured cap and coverage minimum, whether all
 planned minima fit, and per-gap causes and next actions. It is a mechanical
 coverage diagnostic, not a claim review or release approval. Rerunning triage
 replaces this diagnostic; targeted acquisition attempts remain logged in the
-query plan/log so the bounded-wave budget survives resumption.
+query plan/log. `triage.py begin-delta` reserves the attempt in
+`triage/delta_attempt.json` before dispatch, so the bounded-wave budget survives
+resumption and interrupted dispatch. Title/slug matches are candidates only;
+reviewed shared-origin links group corroboration without dropping unique material.
 
 The evidence engine reads **only**: `triage/corpus.jsonl`,
 `acquisition/raw/*.md` and original response/document bytes plus retrieval

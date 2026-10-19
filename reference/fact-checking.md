@@ -337,3 +337,16 @@ uncertainty and seek domain-expert review when accessible. If adequate review
 is unavailable, retain the blocked/unverified status. Installing more Python
 packages or a free entailment model cannot remove these epistemic limits;
 optional models may flag risks but must never automatically approve a claim.
+
+## Search execution and negative evidence
+
+[search-quality.md](search-quality.md) also governs this release contract.
+The input snapshot binds original search responses. The gate validates their
+schemas/hashes and known-item controls, and excludes failed/inconclusive
+queries and positive-control rows from usable `countersearch_ids`. A zero-result
+search needs a successful control on the same tool, surface, scope and session.
+A failed control cannot support absence. Reviewers must inspect the returned
+records, query variants, pagination, collection coverage and scope of every
+negative inference. A working endpoint does not prove a complete search.
+Hash-bound `triage/lineage.json` reviews and their source files also join the
+snapshot when present; changed lineage invalidates existing reviews.

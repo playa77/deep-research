@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from search_fixtures import search_record
 
 from jsonschema import Draft202012Validator, FormatChecker
 
@@ -52,9 +53,8 @@ class SessionHandoffTests(unittest.TestCase):
                   'medium': 'government', 'search_angle': 'official-records',
                   'raw_file': 'raw/source.md', 'retrieval_record': 'retrieval/source.json'}
         (agent / 'a01.sources.jsonl').write_text(json.dumps(source) + '\n')
-        (agent / 'a01.queries.jsonl').write_text(json.dumps(
-            {'query_text': 'official records', 'tool': 'web_search',
-             'search_angle': 'official-records', 'notes': 'Historic regional records unavailable'}) + '\n')
+        (agent / 'a01.queries.jsonl').write_text(
+            json.dumps(search_record(self.run)) + '\n')
         (self.acq / 'leads.jsonl').write_text('{"lead":"regional archive","why":"coverage gap"}\n')
         for command in ('merge-sources', 'merge-query-log', 'build-source-map'):
             self.cli('citation_manager.py', command, '--acq-dir', str(self.acq))
@@ -129,7 +129,7 @@ class SessionHandoffTests(unittest.TestCase):
         before = self.manifest_path.read_bytes()
         for relative in ('acquisition/raw/source.md', 'acquisition/original/source.html',
                          'acquisition/leads.jsonl', 'acquisition/query_plan.md',
-                         'handoff/processing_prompt.md'):
+                         'handoff/processing_prompt.md', 'acquisition/original/q_test.txt'):
             with self.subTest(relative=relative):
                 path = self.run / relative
                 content = path.read_bytes()
@@ -141,6 +141,58 @@ class SessionHandoffTests(unittest.TestCase):
         manifest['research_contract']['scope'] = 'Changed geography'
         self.write_manifest(manifest)
         self.handoff('check', success=False)
+
+    def test_failed_control_blocks_handoff_before_any_processing(self):
+        control = search_record(self.run, 'failed-control', outcome='inconclusive',
+                                query_role='positive_control', expected_match='Known catalogue entry')
+        negative = search_record(self.run, 'negative', outcome='no_results',
+                                 control_query_id='failed-control')
+        (self.acq / 'query_log.jsonl').write_text(
+            ''.join(json.dumps(q) + '\n' for q in (control, negative)))
+        self.cli('citation_manager.py', 'build-source-map', '--acq-dir', str(self.acq))
+        before = self.manifest_path.read_bytes()
+        result = self.handoff('prepare', success=False)
+        self.assertIn('positive control', result['error'])
+        self.assertEqual(self.manifest_path.read_bytes(), before)
+        self.assertFalse((self.run / 'handoff/acquisition.json').exists())
+        self.assertFalse((self.run / 'triage/corpus.jsonl').exists())
+
+    def test_required_native_search_cannot_be_omitted_from_handoff(self):
+        path = self.acq / 'query_plan.md'
+        path.write_text('```json\n' + json.dumps({'angles': [
+            {'name': 'official-records', 'required_search_surfaces': ['native-catalogue']}]
+        }) + '\n```\n')
+        result = self.handoff('prepare', success=False)
+        self.assertIn('required search surface', result['error'])
+
+    def test_new_session_rejects_a_changed_installed_workflow(self):
+        installed = Path(self.temp.name) / 'installed-skill'
+        shutil.copytree(ROOT, installed, ignore=shutil.ignore_patterns('.git', '__pycache__'))
+        script = installed / 'scripts/session_handoff.py'
+        prepared = subprocess.run([sys.executable, str(script), 'prepare', '--run-dir', str(self.run)],
+                                  capture_output=True, text=True)
+        self.assertEqual(prepared.returncode, 0, prepared.stdout + prepared.stderr)
+        before = self.manifest_path.read_bytes()
+        reference = installed / 'reference/triage.md'
+        reference.write_text(reference.read_text() + '\nChanged workflow contract.\n')
+        resumed = subprocess.run([sys.executable, str(script), 'resume', '--run-dir', str(self.run),
+                                  '--choice', 'new-session'], capture_output=True, text=True)
+        self.assertEqual(resumed.returncode, 1, resumed.stdout + resumed.stderr)
+        self.assertIn('workflow_sha256', resumed.stdout)
+        self.assertEqual(self.manifest_path.read_bytes(), before)
+
+    def test_unresolved_attempts_are_visible_in_the_handoff_summary(self):
+        query = search_record(self.run)
+        failed = search_record(self.run, 'failed-retry', outcome='blocked')
+        (self.acq / 'query_log.jsonl').write_text(
+            ''.join(json.dumps(q) + '\n' for q in (query, failed)))
+        self.cli('citation_manager.py', 'build-source-map', '--acq-dir', str(self.acq))
+        result = self.handoff('prepare')
+        self.assertEqual(result['search_quality']['usable_query_ids'], ['q_test'])
+        self.assertEqual(result['search_quality']['unresolved_searches'][0]['query_id'], 'failed-retry')
+        saved = json.loads((self.run / 'handoff/acquisition.json').read_text())
+        self.assertEqual(saved['version'], 2)
+        self.assertEqual(saved['search_quality'], result['search_quality'])
 
     def test_relocated_bundle_resumes_with_relative_inputs(self):
         self.handoff('prepare')

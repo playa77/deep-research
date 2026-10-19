@@ -15,8 +15,9 @@ complete URL after it; hidden link destinations do not survive paper delivery.
 
 STANDARDS: prose-first (≥80%), precision ("reduced mortality 23% (p<0.01)",
 never "significantly improved"), fact vs synthesis distinguished ("According
-to [1]..." vs "This suggests..."), uncertainty admitted ("No sources found
-addressing X"), speculation labeled. No placeholder text of any kind.
+to [1]..." vs "This suggests..."), uncertainty and search limitations stated
+precisely ("The catalogue search returned no entries for the tested variants"),
+speculation labeled. No placeholder text of any kind.
 
 RELEASE: follow reference/fact-checking.md. Every assertion, including tables
 and methodological claims, needs atomic coverage and independent verifier +

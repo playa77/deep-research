@@ -29,7 +29,7 @@
 
     "content_hash": {
       "type": ["string", "null"],
-      "description": "sha256 of normalized raw body text [:16] — used for exact-duplicate detection",
+      "description": "Full SHA-256 of the complete source body, without truncation or case folding",
       "default": null
     },
     "duplicate_of": {
@@ -42,6 +42,14 @@
       "items": { "type": "string" },
       "description": "source_ids of same-origin syndicated/derivative copies",
       "default": null
+    },
+    "similarity_candidates": {
+      "type": "array", "items": {"type": "string"},
+      "description": "Title/slug review leads only; never delete sources or merge groups"
+    },
+    "lineage_with": {
+      "type": "array", "items": {"type": "string"},
+      "description": "Reviewed hash-bound shared-origin links; nonidentical documents retained"
     },
     "credibility": {
       "type": "number",
