@@ -23,8 +23,9 @@ from the SKILL.md table; when in doubt, ask the user once, then infer.
 
 ### 1.2 Research contract
 
-Capture and record (in `run_manifest.json` assumptions + the eventual report's
-methodology appendix):
+Capture and record the complete contract in `run_manifest.json.research_contract`
+before acquisition, with the original question in `query`, material assumptions
+in `assumptions`, and the eventual methodology appendix reflecting this context:
 
 | Field | Notes |
 |---|---|
@@ -40,6 +41,13 @@ Default assumptions when the user doesn't specify: technical query →
 technical audience; comparison → balanced perspective; trend → recent 1–2
 years. High-materiality assumptions are surfaced in the final report's
 introduction, never silently defaulted.
+
+`research_contract` contains nonempty strings `use_case`, `audience`, `scope`,
+`constraints` and `definition_of_done`. Include all material user instructions,
+budget limits, requested output format and preferences; explicitly record
+unspecified or none values. Keep the detailed angle/query budgets in the plan.
+These files, not the gathering session's conversation, are the processing
+session's complete task context.
 
 ### 1.3 Hypotheses (standard/deep/ultradeep)
 
@@ -188,3 +196,14 @@ query plan for a future resume.
 **Gate (phase complete)**: `sources.jsonl` non-empty; every angle has ≥1
 fetched source or a logged dead-end explanation; every raw file has valid
 frontmatter; query log ≥ 1 row per angle; merge reports 0 malformed rows.
+
+## Mandatory stop: gathering complete
+
+Consolidate agent lead fragments into `acquisition/leads.jsonl` and record the
+stop reason, known gaps and next-search leads in the plan/log. After both gates
+are met, mark only `scope` and `acquire` complete, prepare the checked handoff
+with `session_handoff.py prepare`, and follow
+[session-boundary.md](session-boundary.md): offer the literal fresh-session
+prompt and same-session continuation, then end the turn and wait for the user.
+Do not run source triage, evaluate findings, decide hypotheses or draft a
+report in this task. Processing starts at phase 3 only after the user's choice.
