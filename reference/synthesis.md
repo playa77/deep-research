@@ -43,6 +43,14 @@ order and contracts per `templates/report_template.md`:
 - Distinguish fact from synthesis: "According to [1]..." vs "This suggests...".
 - Admit gaps: "No sources found addressing X" — never fabricate a citation.
 - No placeholders, no "content continues", no truncated sections.
+- Paper delivery must stand alone. The Executive Summary states the actual
+  conclusion, reason and uncertainty. Claims-Evidence Table verdicts state each
+  verifier/red-team outcome and reason in plain language. Never replace a verdict
+  with "see qa/fact_check_result.json", another path, or a link to an audit.
+- Bibliography: one source per entry line, with a blank line between entries
+  so they remain separate paragraphs in rendered Markdown. Keep the clickable
+  page title and also display its complete URL, including query and fragment.
+  Never shorten a URL or rely on the hidden hyperlink destination for print.
 
 ### 6.4 Per-section claim loop
 

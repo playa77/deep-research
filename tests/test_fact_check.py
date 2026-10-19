@@ -64,7 +64,7 @@ class ContractFixture(unittest.TestCase):
         self.raw_path.write_text('---\ntitle: Trial record\n---\nEnrollment\n' + self.quote + '\n', encoding='utf-8')
         persist_retrieval(self.run, self.source, self.quote)
         self.report_path = self.run / 'report/report.md'
-        self.report_path.write_text('## Finding\nThe trial enrolled 100 participants [1].\n\n## Bibliography\n[1] [Trial record](' + self.url + ')\n', encoding='utf-8')
+        self.report_path.write_text('## Finding\nThe trial enrolled 100 participants [1].\n\n## Bibliography\n[1] [Trial record](' + self.url + '). URL: <' + self.url + '>\n', encoding='utf-8')
         (self.run / 'run_manifest.json').write_text(json.dumps({'mode': 'standard'}), encoding='utf-8')
         rows(self.run / 'triage/corpus.jsonl', [self.source])
         rows(self.run / 'evidence/evidence.jsonl', [self.ev])
@@ -350,6 +350,31 @@ class ArithmeticTests(unittest.TestCase):
 class AdditionalContractTests(ContractFixture):
     """Mutations requiring fresh synthetic signatures to exercise deeper gates."""
 
+    def test_hidden_only_bibliography_url_blocks_release_after_fresh_reviews(self):
+        self.report_path.write_text(self.report_path.read_text().replace(f'. URL: <{self.url}>', ''))
+        self.refresh()
+        self.blocked('display the full URL')
+
+    def test_file_only_verdict_blocks_release_after_fresh_reviews(self):
+        self.report_path.write_text(self.report_path.read_text() + '\nVerdict: see qa/fact_check_result.json\n')
+        self.refresh()
+        self.blocked('verdict must state the outcome')
+
+    def test_collapsed_bibliography_blocks_release_after_fresh_reviews(self):
+        self.add_origins()
+        self.report_path.write_text(self.report_path.read_text().replace('\n\n[2]', '\n[2]'))
+        self.refresh()
+        self.blocked('blank line')
+
+    def test_generated_bibliography_matches_release_mapping(self):
+        bibliography = subprocess.run([sys.executable, str(SCRIPTS / 'citation_manager.py'),
+                                       'export-bibliography', '--dir', str(self.run)],
+                                      capture_output=True, text=True, check=True).stdout
+        prefix = self.report_path.read_text().split('## Bibliography')[0]
+        self.report_path.write_text(prefix + bibliography)
+        self.refresh()
+        self.assertEqual(fc.verify(self.run, self.doc)['status'], 'contract_pass')
+
     def refresh(self):
         self.doc['inputs'] = fc.bundle(self.run)[0]
         self.doc['coverage'] = fc.inventory(self.report_path.read_text())
@@ -395,7 +420,7 @@ class AdditionalContractTests(ContractFixture):
         rows(self.run / 'evidence/evidence.jsonl', evs)
         excerpt = 'The trial enrolled 100 participants [' + ', '.join(str(n) for n in range(1, count + 1)) + '].'
         self.claim['locations'] = [{'line': 2, 'excerpt': excerpt}]
-        self.report_path.write_text('## Finding\n' + excerpt + '\n\n## Bibliography\n' + '\n'.join(f'[{n}] [Trial record]({s["raw_url"]})' for n, s in enumerate(sources, 1)) + '\n')
+        self.report_path.write_text('## Finding\n' + excerpt + '\n\n## Bibliography\n' + '\n\n'.join(f'[{n}] [Trial record]({s["raw_url"]}). URL: <{s["raw_url"]}>' for n, s in enumerate(sources, 1)) + '\n')
         self.claim['importance'] = 'major'
         self.refresh()
 
@@ -563,7 +588,7 @@ class AdditionalContractTests(ContractFixture):
         persist_retrieval(self.run, self.source, self.quote)
         rows(self.run / 'triage/corpus.jsonl', [self.source])
         rows(self.run / 'evidence/evidence.jsonl', [self.ev])
-        self.report_path.write_text('## Finding\nDogs chase cats [1].\n\n## Bibliography\n[1] [Trial record](' + self.url + ')\n')
+        self.report_path.write_text('## Finding\nDogs chase cats [1].\n\n## Bibliography\n[1] [Trial record](' + self.url + '). URL: <' + self.url + '>\n')
         self.claim.update(text='Dogs chase cats.', locations=[dict(line=2, excerpt='Dogs chase cats [1].')])
         self.claim['evidence_links'][0]['evidence_id'] = self.ev['evidence_id']
         self.refresh()

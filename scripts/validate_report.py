@@ -11,6 +11,79 @@ from pathlib import Path
 from typing import List, Tuple, Dict
 
 
+def bibliography_presentation_errors(section: str) -> List[str]:
+    """Check the source list stays readable when Markdown is rendered on paper."""
+    errors = []
+    previous_entry = None
+    # Accept both traditional Markdown destinations and angle-delimited URLs.
+    links = re.compile(r'\[[^\n]*?\]\((?:<([^>\n]+)>|([^\s]+))\)')
+    for line_number, line in enumerate(section.splitlines(), 1):
+        entry = re.match(r'^\[(\d+)\]\s+', line)
+        if not entry:
+            continue
+        number = entry.group(1)
+        if previous_entry is not None and line_number == previous_entry + 1:
+            errors.append(f'Bibliography [{number}]: separate sources with a blank line so each renders as its own paragraph')
+        previous_entry = line_number
+        if re.search(r'\s\[\d+\]\s+', line[entry.end():]):
+            errors.append(f'Bibliography [{number}]: put one source per entry line')
+        targets = [a or b for a, b in links.findall(line)]
+        if not targets:
+            errors.append(f'Bibliography [{number}]: include a clickable page title')
+        # A destination hidden behind a title is absent from a paper copy.
+        visible = links.sub('', line)
+        for target in targets:
+            if not (f'<{target}>' in visible or re.search(
+                    r'(?<!\S)' + re.escape(target) + r'(?=\s|$)', visible)):
+                errors.append(f'Bibliography [{number}]: display the full URL as well as the clickable title: {target}')
+    return errors
+
+
+def verdict_presentation_errors(content: str) -> List[str]:
+    """Reject verdicts delegated to files; reviewers still assess their substance."""
+    errors = []
+    # Strip formatting, retaining link labels so "[see audit](...)" is caught.
+    plain = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', content)
+    plain = re.sub(r'[*_`]', '', plain)
+    lines = plain.splitlines()
+    verdict_columns = []
+
+    def reference_only(value):
+        # State the outcome first; artifact references can follow it.
+        if re.match(r'^(?:please\s+)?(?:see|refer|consult|open|read|check)\b', value, re.I):
+            return True
+        value = re.sub(r'(?:\S*[/\\])?\S+\.(?:json|jsonl|md|pdf)\b', '', value, flags=re.I)
+        value = re.sub(r'https?://\S+', '', value, flags=re.I)
+        value = re.sub(r'\b(?:the|in|at|for|details|full|verdict|result|results|qa|audit|file|report|appendix|above|below)\b', '', value, flags=re.I)
+        return not re.search(r'\w', value)
+
+    def check(value, line_number):
+        if reference_only(value):
+            errors.append(f'Line {line_number}: verdict must state the outcome in the report, not only point to an external artifact')
+
+    for index, line in enumerate(lines):
+        if line.lstrip().startswith('|'):
+            cells = [cell.strip() for cell in line.strip().strip('|').split('|')]
+            separator = index + 1 < len(lines) and re.fullmatch(r'[\s|:-]+', lines[index + 1]) and '-' in lines[index + 1]
+            if separator:
+                verdict_columns = [i for i, cell in enumerate(cells)
+                                   if re.search(r'\b(?:verdict|verification status)\b', cell, re.I)]
+            elif re.search(r'\w', line):
+                for column in verdict_columns:
+                    check(cells[column] if column < len(cells) else '', index + 1)
+            continue
+        verdict_columns = []
+        match = re.search(r'\b(?:verdict|verification status)\s*:\s*(.*)', line, re.I)
+        heading = re.match(r'^#{1,6}\s+(?:verdict|verification status)\s*$', line, re.I)
+        if not match and not heading:
+            continue
+        value = match.group(1).strip() if match else ''
+        if not value:
+            value = next((v.strip() for v in lines[index + 1:] if v.strip()), '')
+        check(value, index + 1)
+    return errors
+
+
 class ReportValidator:
     """Validates research report quality"""
 
@@ -40,6 +113,7 @@ class ReportValidator:
             ("Required Sections", self._check_required_sections),
             ("Citations", self._check_citations),
             ("Bibliography", self._check_bibliography),
+            ("Self-contained Verdicts", self._check_verdicts),
             ("Placeholder Text", self._check_placeholders),
             ("Content Truncation", self._check_content_truncation),
             ("Word Count", self._check_word_count),
@@ -154,6 +228,8 @@ class ReportValidator:
             return False
 
         bib_section = match.group(1)
+        presentation_errors = bibliography_presentation_errors(bib_section)
+        self.errors.extend(presentation_errors)
 
         # CRITICAL: Check for truncation placeholders (2025 CiteGuard enhancement)
         truncation_patterns = [
@@ -204,7 +280,12 @@ class ReportValidator:
         if unused:
             self.warnings.append(f"Unused bibliography entries: {sorted(unused)}")
 
-        return True
+        return not presentation_errors
+
+    def _check_verdicts(self) -> bool:
+        errors = verdict_presentation_errors(self.content)
+        self.errors.extend(errors)
+        return not errors
 
     def _check_placeholders(self) -> bool:
         """Check for placeholder text that shouldn't be in final report"""

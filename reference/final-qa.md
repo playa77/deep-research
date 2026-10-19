@@ -23,6 +23,10 @@ to separately recorded verifier and red-team review:
 
 1. Complete acquisition provenance, triage, evidence, current report and
    generated bibliography. Run `validate_report.py --report <run>/report/report.md`.
+   Read a rendered/print preview: each bibliography source must start its own
+   paragraph, retain its clickable page title and display its full URL. Every
+   verdict must state the actual outcome and reason in the report. A paper
+   reader must not need to open QA artifacts to understand the findings.
 2. Run `fact_check.py prepare --run-dir <run>`. The initial contract is
    deliberately unreviewed. Complete the atomic inventory and coverage rows.
 3. Assign a separate verifier and separate red-team session using the bundled
@@ -52,6 +56,11 @@ Keep `report/report.md`, `qa/fact_check.json`, `qa/fact_check_result.json`,
 bundle. Record each of the eight areas above with findings, resolution and
 remaining uncertainty in the QA report. State exactly what verification was
 performed; do not claim that passing a local contract proves all facts true.
+The delivered report itself must also explain the actual outcomes and limits;
+the QA report and machine JSON supplement that explanation. Finalize and review
+this prose before the final gate. If a finding requires changing a verdict,
+revise the report and renew its review snapshot. Never insert the gate's own
+result into the frozen report afterward or use a file pointer as its verdict.
 
 Run the release gate immediately before delivery. Confirm the current result
 is `contract_pass` and corresponds to the delivered report and bundle hashes.

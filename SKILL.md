@@ -148,6 +148,12 @@ year from training data.
    draft report progressively section-by-section to `report/report.md`
    (`templates/report_template.md`), prose-first, every factual claim cited
    `[N]` in the same sentence.
+   Make it self-contained on paper: write the actual verdict, rationale and
+   uncertainty in the Executive Summary and actual verifier/red-team outcomes
+   and reasons in the Claims-Evidence Table and Methodology Appendix. Never
+   substitute a QA file path for a verdict. Bibliography sources each get their
+   own entry line and a blank line between entries; retain clickable page titles
+   AND display the full URL for every source, including query and fragment.
 9. **Critique & gap-fill**: independent critique; evidence gaps → delta-queries.
    Final verifier/red-team findings may also trigger a logged delta wave.
 10. **Final QA** (`reference/final-qa.md`, `reference/fact-checking.md`):
@@ -159,6 +165,8 @@ year from training data.
 11. **Package**: preserve the finalized report/bibliography and current contract
     result, mark phases complete in `run_manifest.json`, write `qa/qa_report.md`.
     Do not rewrite the report or bibliography after its final review.
+    Finalize all in-report verdicts before that review. If findings change them,
+    revise and renew the review; do not append a claimed gate pass to frozen text.
 
 Gate between phases: a phase is done only when its completion criterion in the
 matching reference file is met and its files exist on disk.

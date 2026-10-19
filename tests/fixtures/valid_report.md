@@ -86,16 +86,26 @@ Deep dive into specific implementation case studies.
 
 ## Bibliography
 
-[1] Smith, J. (2025). "Test Research Advances". Journal of Testing. https://example.com/paper1
-[2] Johnson, K. (2025). "Current State Analysis". Research Quarterly. https://example.com/paper2
-[3] Williams, M. (2024). "Comprehensive Review". Academic Press. https://example.com/paper3
-[4] Brown, A. (2025). "Scalability Challenges". Tech Review. https://example.com/paper4
-[5] Davis, R. (2024). "Adoption Barriers". Industry Report. https://example.com/paper5
-[6] Miller, S. (2025). "Implementation Issues". Trade Journal. https://example.com/paper6
-[7] Wilson, T. (2025). "Future Trends". Forecasting Quarterly. https://example.com/paper7
-[8] Moore, L. (2025). "Emerging Solutions". Innovation Today. https://example.com/paper8
-[9] Taylor, P. (2024). "Next Generation Approaches". Tech Horizons. https://example.com/paper9
-[10] Anderson, C. (2025). "Market Outlook". Strategy Brief. https://example.com/paper10
+[1] Smith, J. (2025). [Test Research Advances](<https://example.com/paper1>). Journal of Testing. URL: <https://example.com/paper1>
+
+[2] Johnson, K. (2025). [Current State Analysis](<https://example.com/paper2>). Research Quarterly. URL: <https://example.com/paper2>
+
+[3] Williams, M. (2024). [Comprehensive Review](<https://example.com/paper3>). Academic Press. URL: <https://example.com/paper3>
+
+[4] Brown, A. (2025). [Scalability Challenges](<https://example.com/paper4>). Tech Review. URL: <https://example.com/paper4>
+
+[5] Davis, R. (2024). [Adoption Barriers](<https://example.com/paper5>). Industry Report. URL: <https://example.com/paper5>
+
+[6] Miller, S. (2025). [Implementation Issues](<https://example.com/paper6>). Trade Journal. URL: <https://example.com/paper6>
+
+[7] Wilson, T. (2025). [Future Trends](<https://example.com/paper7>). Forecasting Quarterly. URL: <https://example.com/paper7>
+
+[8] Moore, L. (2025). [Emerging Solutions](<https://example.com/paper8>). Innovation Today. URL: <https://example.com/paper8>
+
+[9] Taylor, P. (2024). [Next Generation Approaches](<https://example.com/paper9>). Tech Horizons. URL: <https://example.com/paper9>
+
+[10] Anderson, C. (2025). [Market Outlook](<https://example.com/paper10>). Strategy Brief. URL: <https://example.com/paper10>
+
 
 ---
 

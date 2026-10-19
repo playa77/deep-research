@@ -80,6 +80,22 @@ unless a lawful accessible version or supplied document is actually read.
 Generate the bibliography using `citation_manager.py export-bibliography` and
 put it in an exact `## Bibliography` section before preparing QA. Display
 numbers depend on corpus order; regenerate them after any corpus change.
+Each source must occupy its own entry line with a blank line between sources
+so the rendered list does not collapse into one paragraph. Preserve clickable
+page titles and display each complete URL separately (`URL: <https://...>` in
+Markdown), including its path, query and fragment. Paper readers cannot inspect
+hidden link destinations. Long URLs may wrap naturally without shortening.
+
+Write the actual conclusion, rationale and uncertainty in the Executive
+Summary. In the Claims-Evidence Table and Methodology Appendix, spell out the
+actual verification and red-team outcomes, reasons, unresolved findings and
+limits. `Verdict: see qa/fact_check_result.json` is never acceptable: audit
+paths and evidence IDs are supplementary references, not report content.
+Reviewers must read these statements as part of the report; do not infer or
+invent successful checks. Format validation and the release gate both reject
+file-only verdicts, collapsed source paragraphs and hidden-only source URLs.
+These mechanical checks do not judge the substance of a verdict; the verifier
+and red team must confirm it against the actual findings.
 
 ```bash
 python -m pip install -r <skill>/requirements.txt
