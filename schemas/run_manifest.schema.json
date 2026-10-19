@@ -14,6 +14,33 @@
       "type": "string",
       "description": "Original research question"
     },
+    "research_contract": {
+      "type": ["object", "null"],
+      "description": "Complete task context for either session. Populate before acquisition; explicit none/unspecified values are allowed, missing context is not.",
+      "required": ["use_case", "audience", "scope", "constraints", "definition_of_done"],
+      "properties": {
+        "use_case": {"type": "string", "pattern": "\\S"},
+        "audience": {"type": "string", "pattern": "\\S"},
+        "scope": {"type": "string", "pattern": "\\S"},
+        "constraints": {"type": "string", "pattern": "\\S"},
+        "definition_of_done": {"type": "string", "pattern": "\\S"}
+      },
+      "additionalProperties": false,
+      "default": null
+    },
+    "processing_handoff": {
+      "type": ["object", "null"],
+      "description": "Acquisition-to-processing boundary. Prepared before the mandatory pause; processing starts only after the user chooses continuation or submits the handoff prompt.",
+      "required": ["status", "next_phase", "snapshot", "prompt"],
+      "properties": {
+        "status": {"enum": ["awaiting_user", "processing"]},
+        "next_phase": {"const": "triage"},
+        "snapshot": {"const": "handoff/acquisition.json"},
+        "prompt": {"const": "handoff/processing_prompt.md"}
+      },
+      "additionalProperties": false,
+      "default": null
+    },
     "mode": {
       "type": "string",
       "enum": ["quick", "standard", "deep", "ultradeep"]
@@ -114,6 +141,7 @@
       "properties": {
         "previous_run_manifest": { "type": "string" },
         "resumed_at": { "type": "string", "format": "date-time" },
+        "session_choice": { "enum": ["same-session", "new-session"] },
         "sections_completed": { "type": "array", "items": { "type": "string" } }
       },
       "default": null

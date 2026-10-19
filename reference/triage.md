@@ -1,5 +1,11 @@
 # Phase 3: Source Triage
 
+This is the first phase of the **information-processing task**, after gathering
+has stopped and the user has chosen continuation here or submitted the
+fresh-session handoff prompt. Resume through
+[session-boundary.md](session-boundary.md) before running triage. Later targeted
+delta-acquisition loops re-enter triage without another initial-boundary pause.
+
 Triage converts the acquisition pile into the evidence engine's working
 corpus. Not verification — triage: cheap, deterministic, mechanical. The
 principle: **194 discovered sources is excellent acquisition but terrible

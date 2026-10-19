@@ -230,6 +230,8 @@ def cmd_init_run(args: argparse.Namespace) -> None:
         'started_at': now_iso(),
         'finished_at': None,
         'assumptions': [],
+        'research_contract': None,
+        'processing_handoff': None,
         'provider_config': {
             'primary': 'web_search',
             'scholarly': None,

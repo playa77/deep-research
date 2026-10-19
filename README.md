@@ -5,6 +5,43 @@ source triage and a **fail-closed fact-checking release contract**. No paid
 verification API, hosted service or additional model subscription is required.
 Use the available search tools and models; Python validation runs locally.
 
+## Two tasks, optional two sessions
+
+The skill keeps its two original research workflows separate:
+
+- **Information gathering (phases 1–2):** the standardhuman acquisition engine
+  scopes the question, searches and fetches broadly, then merges its source
+  material into the durable acquisition bundle. It produces no conclusions.
+- **Information processing (phases 3–8):** source triage prepares that bundle
+  for the 199-biotechnologies evidence laboratory, which evaluates evidence,
+  analyzes, writes the report and completes independent verification and QA.
+
+**Gathering always stops before processing.** The agent saves the full research
+contract and a checked bundle snapshot, asks whether to continue in the same
+session, and supplies a literal handoff prompt for a fresh session. It waits
+for the user's choice. The new session starts at source triage with the same
+original material and quality requirements; no work is replaced with a summary
+and no verification step is removed. This makes a fresh context available for
+models that become unreliable during long research sessions.
+
+The helper commands are:
+
+```bash
+# After scope/acquisition gates are met and recorded; then present the prompt and stop:
+python scripts/session_handoff.py prepare --run-dir <run>
+# Only after the user chooses continuation here:
+python scripts/session_handoff.py resume --run-dir <run> --choice same-session
+# Or, in the user-requested fresh session:
+python scripts/session_handoff.py resume --run-dir <run> --choice new-session
+```
+
+The saved prompt is `handoff/processing_prompt.md`. The boundary check confirms
+saved inputs and their integrity, not their truth or research completeness.
+Processing retains the existing targeted gap-filling loops and all final-QA
+gates. See [the session boundary protocol](reference/session-boundary.md).
+
+## Fact-checking
+
 The previous strict checker could approve a missing ledger, negated claims,
 wrong magnitudes and incomplete review. The hardened implementation removes
 word overlap as evidence of support and requires:
@@ -80,8 +117,9 @@ contract has its own complete inventory and atomic claims.
 
 ## Pipeline and layout
 
-Scope → acquire → triage → evidence → triangulate → synthesize → critique and
-delta-acquisition → independent verification and red team → release gate.
+Scope → acquire/merge → **stop and offer session choice** → triage → evidence →
+triangulate → synthesize → critique and delta-acquisition → independent
+verification and red team → release gate.
 
 State lives in a resumable acquisition/evidence bundle. Source IDs survive
 continuation; report-local display numbers must be regenerated after corpus
