@@ -40,6 +40,7 @@ Produced by phase 2 (ACQUIRE), consumed by phases 3–8. Created by
       acquisition-agent-03.queries.jsonl
   triage/
     triage_report.md           # dedupe, clusters, credibility, gaps, decisions
+    triage_result.json         # current coverage status, capacity and next actions
     corpus.jsonl               # THE curated corpus (schemas/corpus.schema.json)
     overrides.json             # optional manual independence-group assignments
   evidence/
@@ -164,6 +165,13 @@ summaries never replace source material. A handoff check is not verification.
 `credibility` (0–100), `independence_group_id`, `triage_status`
 (`selected` | `reserve` | `dropped`), `selection_reason`, duplicate flags.
 See `schemas/corpus.schema.json` and `reference/triage.md`.
+
+`triage/triage_result.json` records `status: ok | coverage_gaps`, selected/
+reserve/dropped totals, the configured cap and coverage minimum, whether all
+planned minima fit, and per-gap causes and next actions. It is a mechanical
+coverage diagnostic, not a claim review or release approval. Rerunning triage
+replaces this diagnostic; targeted acquisition attempts remain logged in the
+query plan/log so the bounded-wave budget survives resumption.
 
 The evidence engine reads **only**: `triage/corpus.jsonl`,
 `acquisition/raw/*.md` and original response/document bytes plus retrieval

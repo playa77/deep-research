@@ -134,6 +134,13 @@ continuation; report-local display numbers must be regenerated after corpus
 changes. Review snapshots detect stale report, source, evidence and query-log
 inputs. See [the acquisition contract](reference/contract.md).
 
+Triage allocates eligible sources across planned angles before filling the
+remaining corpus by rank. It retains the credibility threshold, duplicate
+handling and verification requirements. `triage/triage_result.json`
+distinguishes corpus-cap constraints from genuine acquisition shortfalls;
+only the latter call for the single bounded triage delta wave. Unresolved
+coverage still exits 2. See [source triage](reference/triage.md).
+
 `reference/` contains protocols and the audit; `scripts/` contains tooling;
 `schemas/` defines records; `templates/` contains the report and review prompts;
 `tests/` contains local adversarial regression and pipeline tests.

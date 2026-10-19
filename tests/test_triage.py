@@ -217,6 +217,125 @@ class TestSelect(unittest.TestCase):
         self.assertEqual(statuses.count('selected'), 2)
         self.assertEqual(statuses.count('reserve'), 3)
 
+    def test_low_credibility_reserve_does_not_consume_selected_capacity(self):
+        sources = [
+            {'source_id': 'low', 'origin': 'primary', 'credibility': 35},
+            {'source_id': 'usable', 'origin': 'secondary', 'credibility': 70},
+        ]
+        triage.step_select(sources, self.tmp, max_sources=1)
+        self.assertEqual(sources[0]['triage_status'], 'reserve')
+        self.assertIn('verify before use', sources[0]['selection_reason'])
+        self.assertEqual(sources[1]['triage_status'], 'selected')
+
+    def test_planned_coverage_precedes_filling_by_global_rank(self):
+        self.fx.write_plan(['general', 'variant-cluster'])
+        sources = [
+            {'source_id': f'general-{i}', 'origin': 'primary',
+             'credibility': 90, 'search_angle': 'general'} for i in range(5)
+        ] + [
+            {'source_id': f'variant-{i}', 'origin': 'secondary',
+             'credibility': 60, 'search_angle': 'variant-cluster'} for i in range(2)
+        ]
+        triage.step_select(sources, self.tmp, max_sources=4)
+        selected = [s for s in sources if s['triage_status'] == 'selected']
+        self.assertEqual(len(selected), 4)
+        self.assertEqual(sum(s['search_angle'] == 'variant-cluster' for s in selected), 2)
+        self.assertEqual(triage.step_gaps(sources, self.tmp), [])
+
+    def test_insufficient_capacity_covers_each_angle_before_second_source(self):
+        self.fx.write_plan(['general', 'variant-cluster'])
+        sources = [
+            {'source_id': f'general-{i}', 'origin': 'primary',
+             'credibility': 90, 'search_angle': 'general'} for i in range(3)
+        ] + [
+            {'source_id': f'variant-{i}', 'origin': 'secondary',
+             'credibility': 60, 'search_angle': 'variant-cluster'} for i in range(2)
+        ]
+        triage.step_select(sources, self.tmp, max_sources=2)
+        selected = [s for s in sources if s['triage_status'] == 'selected']
+        self.assertEqual({s['search_angle'] for s in selected}, {'general', 'variant-cluster'})
+        gaps = triage.step_gaps(sources, self.tmp)
+        self.assertEqual(len(gaps), 2)
+        self.assertTrue(all(g['next_action'] == 'review_corpus_cap' for g in gaps))
+        self.assertTrue(all(g['additional_sources_needed'] == 0 for g in gaps))
+
+    def test_custom_minimum_is_used_for_selection(self):
+        self.fx.write_plan(['general', 'variant-cluster'])
+        sources = [
+            {'source_id': f'general-{i}', 'origin': 'primary',
+             'credibility': 90, 'search_angle': 'general'} for i in range(3)
+        ] + [{'source_id': 'variant', 'origin': 'secondary',
+              'credibility': 60, 'search_angle': 'variant-cluster'}]
+        triage.step_select(sources, self.tmp, max_sources=3, min_per_angle=1)
+        self.assertEqual(triage.step_gaps(sources, self.tmp, min_per_angle=1), [])
+        self.assertEqual(sum(s['triage_status'] == 'selected' for s in sources), 3)
+
+    def test_coverage_never_promotes_low_credibility_or_derivative_sources(self):
+        self.fx.write_plan(['general', 'variant-cluster'])
+        sources = [
+            {'source_id': 'general', 'origin': 'primary', 'credibility': 90,
+             'search_angle': 'general'},
+            {'source_id': 'variant', 'origin': 'primary', 'credibility': 80,
+             'search_angle': 'variant-cluster', 'syndication_with': ['derivative']},
+            {'source_id': 'derivative', 'origin': 'secondary', 'credibility': 80,
+             'search_angle': 'variant-cluster', 'syndication_with': ['variant']},
+            {'source_id': 'duplicate', 'origin': 'primary', 'credibility': 90,
+             'search_angle': 'variant-cluster', 'duplicate_of': 'variant'},
+            {'source_id': 'weak', 'origin': 'primary', 'credibility': 39.9,
+             'search_angle': 'variant-cluster'},
+        ]
+        triage.step_select(sources, self.tmp, max_sources=10)
+        by_id = {s['source_id']: s for s in sources}
+        self.assertEqual(by_id['variant']['triage_status'], 'selected')
+        self.assertEqual(by_id['derivative']['triage_status'], 'dropped')
+        self.assertEqual(by_id['duplicate']['triage_status'], 'dropped')
+        self.assertEqual(by_id['weak']['triage_status'], 'reserve')
+        gap = next(g for g in triage.step_gaps(sources, self.tmp)
+                   if g['angle'] == 'variant-cluster')
+        self.assertEqual(gap['selected_sources'], 1)
+        self.assertEqual(gap['additional_sources_needed'], 1)
+
+    def test_coverage_keeps_best_sources_per_angle_then_fills_by_rank(self):
+        self.fx.write_plan(['general', 'variant-cluster'])
+        sources = [
+            {'source_id': 'best', 'origin': 'primary', 'credibility': 95,
+             'search_angle': 'general'},
+            {'source_id': 'second', 'origin': 'primary', 'credibility': 90,
+             'search_angle': 'general'},
+            {'source_id': 'extra', 'origin': 'primary', 'credibility': 85,
+             'search_angle': 'general'},
+            {'source_id': 'lower', 'origin': 'secondary', 'credibility': 75,
+             'search_angle': 'general'},
+            {'source_id': 'variant-best', 'origin': 'primary', 'credibility': 70,
+             'search_angle': 'variant-cluster'},
+            {'source_id': 'variant-second', 'origin': 'secondary', 'credibility': 60,
+             'search_angle': 'variant-cluster'},
+            {'source_id': 'variant-lower', 'origin': 'secondary', 'credibility': 50,
+             'search_angle': 'variant-cluster'},
+        ]
+        triage.step_select(sources, self.tmp, max_sources=5)
+        self.assertEqual({s['source_id'] for s in sources if s['triage_status'] == 'selected'},
+                         {'best', 'second', 'extra', 'variant-best', 'variant-second'})
+        for s in sources:
+            if s['triage_status'] == 'selected':
+                self.assertIn(f"credibility={s['credibility']}", s['selection_reason'])
+
+    def test_uncapped_selection_keeps_all_eligible_sources(self):
+        self.fx.write_plan(['general', 'variant-cluster'])
+        sources = [
+            {'source_id': 'core', 'origin': 'primary', 'credibility': 95,
+             'search_angle': 'general'},
+            {'source_id': 'critical', 'origin': 'secondary', 'credibility': 70,
+             'search_angle': 'unplanned-counterevidence'},
+            {'source_id': 'boundary', 'origin': 'secondary', 'credibility': 40,
+             'search_angle': 'variant-cluster'},
+            {'source_id': 'weak', 'origin': 'primary', 'credibility': 39.9,
+             'search_angle': 'variant-cluster'},
+        ]
+        triage.step_select(sources, self.tmp, max_sources=10)
+        self.assertEqual({s['source_id'] for s in sources if s['triage_status'] == 'selected'},
+                         {'core', 'critical', 'boundary'})
+
 
 class TestGaps(unittest.TestCase):
     def setUp(self):
@@ -244,6 +363,33 @@ class TestGaps(unittest.TestCase):
         self.assertEqual(by_angle['criticism']['severity'], 'undercovered')
         self.assertEqual(by_angle['french-government-records']['severity'], 'uncovered')
         self.assertNotIn('stats', by_angle)
+
+    def test_missing_eligible_sources_requests_only_the_actual_shortfall(self):
+        self.fx.write_plan(['variant-cluster'])
+        sources = [
+            {'source_id': 'selected', 'search_angle': 'variant-cluster',
+             'triage_status': 'selected'},
+            {'source_id': 'untrusted', 'search_angle': 'variant-cluster',
+             'triage_status': 'reserve', 'credibility': 35,
+             'selection_reason': 'credibility 35 < 40: verify before use'},
+            {'source_id': 'copy', 'search_angle': 'variant-cluster',
+             'triage_status': 'dropped', 'selection_reason': 'exact duplicate'},
+        ]
+        gap, = triage.step_gaps(sources, self.tmp)
+        self.assertEqual(gap['selected_sources'], 1)
+        self.assertEqual(gap['eligible_sources'], 1)
+        self.assertEqual(gap['reserve_sources'], 1)
+        self.assertEqual(gap['dropped_sources'], 1)
+        self.assertEqual(gap['additional_sources_needed'], 1)
+        self.assertEqual(gap['next_action'], 'delta_acquisition')
+
+    def test_plan_ids_and_names_refer_to_the_same_angle(self):
+        self.fx.write_plan(['variant-cluster'])
+        sources = [
+            {'source_id': 'one', 'search_angle': 'angle-01', 'triage_status': 'selected'},
+            {'source_id': 'two', 'search_angle': 'variant-cluster', 'triage_status': 'selected'},
+        ]
+        self.assertEqual(triage.step_gaps(sources, self.tmp), [])
 
 
 class TestFullRun(unittest.TestCase):
@@ -298,12 +444,75 @@ class TestFullRun(unittest.TestCase):
         self.fx.write_plan(['stats', 'missing-angle'])
         result = triage.run_triage(self.tmp, 'standard', max_sources=10, min_per_angle=1)
         self.assertEqual([g['angle'] for g in result['gaps']], ['missing-angle'])
+        self.assertEqual(result['status'], 'coverage_gaps')
+        with open(result['result']) as f:
+            self.assertEqual(json.load(f), result)
         # CLI exit code 2 signals gaps
         proc = subprocess.run(
             [sys.executable, os.path.join(SCRIPTS, 'triage.py'), 'run',
              '--run-dir', self.tmp, '--mode', 'standard', '--max-sources', '10'],
             capture_output=True, text=True)
         self.assertEqual(proc.returncode, 2)
+
+    def test_gaps_subcommand_matches_full_triage(self):
+        self.fx.add_source('https://a.com/1', 'One', search_angle='stats',
+                           origin='primary', body='first unique source')
+        self.fx.add_source('https://b.com/2', 'Two', search_angle='stats',
+                           origin='primary', body='second unique source')
+        self.fx.write_plan(['stats', 'missing-angle'])
+        expected = triage.run_triage(self.tmp, 'standard', max_sources=40, min_per_angle=2)
+        proc = subprocess.run(
+            [sys.executable, os.path.join(SCRIPTS, 'triage.py'), 'gaps',
+             '--run-dir', self.tmp], capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(proc.stdout), expected['gaps'])
+
+    def test_gaps_subcommand_honors_custom_limits(self):
+        self.fx.add_source('https://a.com/1', 'One', search_angle='stats',
+                           origin='primary', body='unique source')
+        self.fx.write_plan(['stats'])
+        expected = triage.run_triage(self.tmp, 'quick', max_sources=1, min_per_angle=1)
+        proc = subprocess.run(
+            [sys.executable, os.path.join(SCRIPTS, 'triage.py'), 'gaps',
+             '--run-dir', self.tmp, '--mode', 'quick', '--max-sources', '1',
+             '--min-per-angle', '1'], capture_output=True, text=True, check=True)
+        self.assertEqual(json.loads(proc.stdout), expected['gaps'])
+
+    def test_real_gap_persists_until_another_eligible_source_arrives(self):
+        self.fx.write_plan(['variant-cluster'])
+        self.fx.add_source('https://a.com/one', 'Original study',
+                           search_angle='variant-cluster', origin='primary', body='original body')
+        before = triage.run_triage(self.tmp, 'standard', max_sources=10, min_per_angle=2)
+        self.assertEqual(before['status'], 'coverage_gaps')
+        self.assertEqual(before['gaps'][0]['additional_sources_needed'], 1)
+        self.fx.add_source('https://b.org/two', 'Independent dataset',
+                           search_angle='variant-cluster', origin='primary', body='independent data')
+        after = triage.run_triage(self.tmp, 'standard', max_sources=10, min_per_angle=2)
+        self.assertEqual(after['status'], 'ok')
+        self.assertEqual(after['gaps'], [])
+        self.assertEqual(after['counts']['selected'], 2)
+        repeated = triage.run_triage(self.tmp, 'standard', max_sources=10, min_per_angle=2)
+        self.assertEqual(after, repeated)
+
+    def test_impossible_capacity_is_reported_without_changing_limits(self):
+        self.fx.write_plan(['general', 'variant-cluster'])
+        result = triage.run_triage(self.tmp, 'standard', max_sources=3, min_per_angle=2)
+        self.assertEqual(result['status'], 'coverage_gaps')
+        self.assertEqual(result['max_sources'], 3)
+        self.assertEqual(result['minimum_per_angle'], 2)
+        self.assertEqual(result['coverage_capacity'],
+                         {'minimum_required_sources': 4, 'sufficient': False})
+        with open(result['report']) as f:
+            self.assertIn('Capacity constraint:', f.read())
+
+    def test_nonpositive_cli_limits_are_rejected(self):
+        for flag in ('--max-sources', '--min-per-angle'):
+            for value in ('0', '-1'):
+                with self.subTest(flag=flag, value=value):
+                    proc = subprocess.run(
+                        [sys.executable, os.path.join(SCRIPTS, 'triage.py'), 'run',
+                         '--run-dir', self.tmp, flag, value], capture_output=True, text=True)
+                    self.assertEqual(proc.returncode, 2)
+                    self.assertIn('must be a positive integer', proc.stderr)
 
 
 if __name__ == '__main__':

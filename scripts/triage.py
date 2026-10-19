@@ -13,8 +13,8 @@ CLI subcommands:
   cluster   Assign independence groups (same origin = one group)
   score     Attach credibility scores (via source_evaluator)
   select    Compute research-worthiness and mark selected/reserve/dropped
-  gaps      Compare planned angles against discovered sources
-  run       Execute the full sequence; write corpus.jsonl + triage_report.md
+  gaps      Compare planned angles against freshly selected sources
+  run       Execute the full sequence; write corpus, report, and JSON result
 
 All subcommands are deterministic and stdlib-only, so triage can be re-run
 cheaply after delta-acquisition without losing decisions (re-running `run`
@@ -169,6 +169,17 @@ def load_overrides(run_dir: str) -> dict:
         return {}
 
 
+def plan_angle_aliases(run_dir: str) -> dict[str, str]:
+    """Resolve either a planned angle's ID or its name to the display name."""
+    angles = load_plan_angles(run_dir)
+    aliases = {a.get('name') or a.get('id') or 'unnamed':
+               a.get('name') or a.get('id') or 'unnamed' for a in angles}
+    for angle in angles:
+        if angle.get('id'):
+            aliases.setdefault(angle['id'], angle.get('name') or angle['id'])
+    return aliases
+
+
 # ---------------------------------------------------------------------------
 # Steps
 # ---------------------------------------------------------------------------
@@ -318,8 +329,11 @@ def step_score(sources: list[dict], run_dir: str) -> None:
 
 
 def step_select(sources: list[dict], run_dir: str, max_sources: int,
-                min_credibility_reserve: float = MIN_CREDIBILITY) -> None:
-    """Mark each source selected / reserve / dropped with a reason."""
+                min_credibility_reserve: float = MIN_CREDIBILITY,
+                min_per_angle: int = DEFAULT_MIN_PER_ANGLE) -> None:
+    """Cover planned angles with eligible sources, then fill by global rank."""
+    if max_sources < 1 or min_per_angle < 1:
+        raise ValueError('max_sources and min_per_angle must be positive')
     for s in sources:
         if s.get('duplicate_of'):
             s['triage_status'] = 'dropped'
@@ -374,47 +388,87 @@ def step_select(sources: list[dict], run_dir: str, max_sources: int,
     candidates = [s for s in sources if not s.get('triage_status')]
     candidates.sort(key=priority, reverse=True)
 
-    selected_count = 0
+    eligible = []
     for s in candidates:
         cred = s.get('credibility', 0)
         if cred < DROP_CREDIBILITY and s.get('origin') == 'tertiary':
             s['triage_status'] = 'dropped'
             s['selection_reason'] = f'low credibility ({cred}) and tertiary origin'
             continue
-        if selected_count >= max_sources:
-            s['triage_status'] = 'reserve'
-            s['selection_reason'] = 'corpus target reached'
-            continue
         if cred < min_credibility_reserve:
             s['triage_status'] = 'reserve'
             s['selection_reason'] = f'credibility {cred} < {min_credibility_reserve}: verify before use'
-            selected_count += 1
+            continue
+        eligible.append(s)
+
+    # Allocate one source per planned angle before allocating a second. Within
+    # each round, ranking breaks ties if the cap cannot cover every angle.
+    # Reserve rows never consume selected capacity or satisfy coverage quotas.
+    aliases = plan_angle_aliases(run_dir)
+    per_angle: dict[str, list[dict]] = {}
+    for s in eligible:
+        angle = aliases.get(s.get('search_angle'))
+        if angle:
+            per_angle.setdefault(angle, []).append(s)
+    chosen: set[str] = set()
+    rounds = min(min_per_angle, max((len(rows) for rows in per_angle.values()), default=0))
+    for i in range(rounds):
+        round_candidates = [rows[i] for rows in per_angle.values() if len(rows) > i]
+        for s in sorted(round_candidates, key=priority, reverse=True):
+            if len(chosen) >= max_sources:
+                break
+            chosen.add(s['source_id'])
+        if len(chosen) >= max_sources:
+            break
+    coverage_chosen = set(chosen)
+    for s in eligible:
+        if len(chosen) >= max_sources:
+            break
+        chosen.add(s['source_id'])
+
+    for s in eligible:
+        if s['source_id'] not in chosen:
+            s['triage_status'] = 'reserve'
+            s['selection_reason'] = 'corpus target reached'
             continue
         s['triage_status'] = 'selected'
         s['selection_reason'] = (
-            f"origin={s.get('origin')}, credibility={cred}, "
+            f"origin={s.get('origin')}, credibility={s.get('credibility', 0)}, "
             f"angle={s.get('search_angle') or 'unassigned'}")
-        selected_count += 1
+        if s['source_id'] in coverage_chosen:
+            s['selection_reason'] += '; planned-angle minimum'
 
 
 def step_gaps(sources: list[dict], run_dir: str,
               min_per_angle: int = DEFAULT_MIN_PER_ANGLE) -> list[dict]:
-    """Return gap list: planned angles with too few selected sources."""
-    selected = [s for s in sources if s.get('triage_status') == 'selected']
-    per_angle: dict[str, int] = {}
-    for s in selected:
+    """Distinguish genuine acquisition shortfalls from corpus-cap constraints."""
+    aliases = plan_angle_aliases(run_dir)
+    per_angle: dict[str, list[dict]] = {}
+    for s in sources:
         angle = s.get('search_angle') or 'unassigned'
-        per_angle[angle] = per_angle.get(angle, 0) + 1
+        per_angle.setdefault(aliases.get(angle, angle), []).append(s)
 
     gaps = []
-    for angle in load_plan_angles(run_dir):
-        name = angle.get('name') or angle.get('id') or 'unnamed'
-        count = per_angle.get(name, 0)
-        if count == 0:
-            gaps.append({'angle': name, 'selected_sources': 0, 'severity': 'uncovered'})
-        elif count < min_per_angle:
-            gaps.append({'angle': name, 'selected_sources': count,
-                         'severity': 'undercovered', 'minimum': min_per_angle})
+    for name in dict.fromkeys(aliases.values()):
+        rows = per_angle.get(name, [])
+        count = sum(s.get('triage_status') == 'selected' for s in rows)
+        if count >= min_per_angle:
+            continue
+        eligible = count + sum(s.get('triage_status') == 'reserve'
+                               and s.get('selection_reason') == 'corpus target reached'
+                               for s in rows)
+        cap_limited = eligible >= min_per_angle
+        gaps.append({
+            'angle': name, 'selected_sources': count,
+            'severity': 'uncovered' if count == 0 else 'undercovered',
+            'minimum': min_per_angle, 'deficit': min_per_angle - count,
+            'eligible_sources': eligible,
+            'reserve_sources': sum(s.get('triage_status') == 'reserve' for s in rows),
+            'dropped_sources': sum(s.get('triage_status') == 'dropped' for s in rows),
+            'additional_sources_needed': max(0, min_per_angle - eligible),
+            'cause': 'corpus_cap' if cap_limited else 'insufficient_eligible_sources',
+            'next_action': 'review_corpus_cap' if cap_limited else 'delta_acquisition',
+        })
     return gaps
 
 
@@ -423,7 +477,7 @@ def step_gaps(sources: list[dict], run_dir: str,
 # ---------------------------------------------------------------------------
 
 def write_report(sources: list[dict], gaps: list[dict], run_dir: str,
-                 max_sources: int) -> str:
+                 max_sources: int, min_per_angle: int = DEFAULT_MIN_PER_ANGLE) -> str:
     selected = [s for s in sources if s.get('triage_status') == 'selected']
     reserve = [s for s in sources if s.get('triage_status') == 'reserve']
     dropped = [s for s in sources if s.get('triage_status') == 'dropped']
@@ -454,14 +508,23 @@ def write_report(sources: list[dict], gaps: list[dict], run_dir: str,
     for gid, count in sorted(groups.items(), key=lambda kv: -kv[1]):
         lines.append(f'- {gid}: {count} source(s)')
     lines += ['', '## Coverage Gaps', '']
+    required = len(set(plan_angle_aliases(run_dir).values())) * min_per_angle
+    if required > max_sources:
+        lines.append(f'Capacity constraint: {required} selected slots are needed for all planned minima, but the cap is {max_sources}. Review the cap against the agreed scope before delta-acquisition; do not lower coverage or quality requirements to clear the gate.')
+        lines.append('')
     if not gaps:
-        lines.append('None — every planned angle has selected sources.')
+        lines.append('None — every planned angle meets minimum selected-source coverage.')
     else:
         for g in gaps:
             if g['severity'] == 'uncovered':
-                lines.append(f'- **UNCOVERED**: {g["angle"]} — no selected sources; delta-acquisition required')
+                lines.append(f'- **UNCOVERED**: {g["angle"]} — no selected sources (min {g["minimum"]})')
             else:
                 lines.append(f'- **UNDERCOVERED**: {g["angle"]} — {g["selected_sources"]} selected (min {g.get("minimum", 2)})')
+            lines.append(f'  - Eligible: {g["eligible_sources"]}; reserve: {g["reserve_sources"]}; dropped: {g["dropped_sources"]}.')
+            if g['next_action'] == 'review_corpus_cap':
+                lines.append('  - Review the corpus cap against the agreed scope: enough eligible sources already exist; additional searches cannot resolve this capacity constraint.')
+            else:
+                lines.append(f'  - Delta-acquisition target: {g["additional_sources_needed"]} additional eligible source(s), within the single bounded wave budget.')
     lines += ['', '## Decisions', '',
               '| source_id | title | origin | cred | group | status | reason |',
               '|---|---|---|---|---|---|---|']
@@ -490,8 +553,8 @@ def run_triage(run_dir: str, mode: str, max_sources: int | None,
     step_dedupe(sources, run_dir)
     step_cluster(sources, run_dir)
     step_score(sources, run_dir)
-    cap = max_sources or DEFAULT_MAX_SOURCES.get(mode, 40)
-    step_select(sources, run_dir, cap)
+    cap = max_sources if max_sources is not None else DEFAULT_MAX_SOURCES.get(mode, 40)
+    step_select(sources, run_dir, cap, min_per_angle=min_per_angle)
     gaps = step_gaps(sources, run_dir, min_per_angle)
 
     # write corpus (all sources with triage fields, selected first)
@@ -506,23 +569,40 @@ def run_triage(run_dir: str, mode: str, max_sources: int | None,
         for s in sources:
             f.write(json.dumps(s, ensure_ascii=False) + '\n')
 
-    report_path = write_report(sources, gaps, run_dir, cap)
+    report_path = write_report(sources, gaps, run_dir, cap, min_per_angle)
 
     counts = {'selected': 0, 'reserve': 0, 'dropped': 0}
     for s in sources:
         st = s.get('triage_status')
         if st in counts:
             counts[st] += 1
-    return {
-        'status': 'ok', 'discovered': len(sources), 'counts': counts,
+    result_path = os.path.join(run_dir, 'triage', 'triage_result.json')
+    required = len(set(plan_angle_aliases(run_dir).values())) * min_per_angle
+    result = {
+        'status': 'coverage_gaps' if gaps else 'ok',
+        'discovered': len(sources), 'counts': counts,
         'gaps': gaps, 'corpus': corpus_path, 'report': report_path,
-        'max_sources': cap,
+        'max_sources': cap, 'minimum_per_angle': min_per_angle,
+        'coverage_capacity': {'minimum_required_sources': required,
+                              'sufficient': cap >= required},
+        'result': result_path,
     }
+    with open(result_path, 'w', encoding='utf-8') as f:
+        json.dump(result, f, indent=2, ensure_ascii=False)
+        f.write('\n')
+    return result
 
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
+
+def positive_int(value: str) -> int:
+    number = int(value)
+    if number < 1:
+        raise argparse.ArgumentTypeError('must be a positive integer')
+    return number
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -535,18 +615,19 @@ def main() -> None:
         ('cluster', 'Assign independence groups'),
         ('score', 'Attach credibility scores'),
         ('select', 'Mark selected/reserve/dropped'),
-        ('gaps', 'Detect coverage gaps vs plan'),
     ]:
         p = sub.add_parser(name, help=help_txt)
         p.add_argument('--run-dir', required=True)
 
-    p_run = sub.add_parser('run', help='Full triage: dedupe→cluster→score→select→gaps')
-    p_run.add_argument('--run-dir', required=True)
-    p_run.add_argument('--mode', default='standard',
+    for name, help_txt in [('run', 'Full triage: dedupe→cluster→score→select→gaps'),
+                           ('gaps', 'Detect coverage gaps using current triage decisions')]:
+        p = sub.add_parser(name, help=help_txt)
+        p.add_argument('--run-dir', required=True)
+        p.add_argument('--mode', default='standard',
                        choices=['quick', 'standard', 'deep', 'ultradeep'])
-    p_run.add_argument('--max-sources', type=int, default=None,
+        p.add_argument('--max-sources', type=positive_int, default=None,
                        help='Override corpus target for the mode')
-    p_run.add_argument('--min-per-angle', type=int, default=DEFAULT_MIN_PER_ANGLE)
+        p.add_argument('--min-per-angle', type=positive_int, default=DEFAULT_MIN_PER_ANGLE)
 
     args = parser.parse_args()
 
@@ -554,7 +635,7 @@ def main() -> None:
         result = run_triage(args.run_dir, args.mode, args.max_sources, args.min_per_angle)
         print(json.dumps(result, indent=2, ensure_ascii=False))
         if result['gaps']:
-            sys.exit(2)  # signal: gaps need delta-acquisition
+            sys.exit(2)  # signal: unresolved coverage; inspect next_action/capacity
         return
 
     # single-step subcommands (print resulting rows for inspection)
@@ -572,7 +653,12 @@ def main() -> None:
         step_score(sources, args.run_dir)
         step_select(sources, args.run_dir, DEFAULT_MAX_SOURCES['standard'])
     elif args.command == 'gaps':
-        print(json.dumps(step_gaps(sources, args.run_dir), indent=2))
+        step_dedupe(sources, args.run_dir)
+        step_cluster(sources, args.run_dir)
+        step_score(sources, args.run_dir)
+        cap = args.max_sources if args.max_sources is not None else DEFAULT_MAX_SOURCES[args.mode]
+        step_select(sources, args.run_dir, cap, min_per_angle=args.min_per_angle)
+        print(json.dumps(step_gaps(sources, args.run_dir, args.min_per_angle), indent=2))
         return
     for s in sources:
         print(json.dumps({k: v for k, v in s.items() if not k.startswith('_')},
