@@ -1,4 +1,4 @@
-# Deep Research — evidence and adversarial verification for Hermes
+# Deep Research for Hermes
 
 A multi-source research skill combining broad acquisition, durable evidence,
 source triage and a **fail-closed fact-checking release contract**. No paid
