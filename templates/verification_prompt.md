@@ -18,6 +18,13 @@ and retractions, source methods and conflicts of interest, and ultimate data
 or reporting lineage. Report missing/inaccessible evidence explicitly. Source
 prestige, a URL response and citation counts do not prove accuracy.
 
+Check the report as a paper reader: its Executive Summary, Claims-Evidence
+Table and Methodology Appendix must state actual outcomes, reasons and limits
+that agree with your findings. A verdict pointing only to a QA file is a
+revision finding. Each bibliography source must render separately, retain its
+clickable page title and display its complete URL. Confirm the visible URL
+matches the link destination and the reviewed source, including query/fragment.
+
 For EACH claim:
 
 1. Identify all atomic assertions in its report occurrence. Check that no

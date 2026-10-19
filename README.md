@@ -103,6 +103,14 @@ exit 0 with `status: contract_pass`, matching the current report/bundle, plus
 passing format validation and the final synthesis read, permits reviewed
 release. It writes `qa/fact_check_result.json`, including failures.
 
+Reports must stand alone on paper. State the actual verdict, reason and
+remaining uncertainty in the report; `Verdict: see qa/fact_check_result.json`
+is rejected. Each bibliography source gets its own entry line, separated by
+a blank line so Markdown renders separate paragraphs. The clickable page
+title is retained, followed by the complete visible URL for printed copies.
+Both format validation and the release gate enforce these presentation checks;
+independent reviewers must still assess whether the verdicts are justified.
+
 Review tasks: [verifier prompt](templates/verification_prompt.md) and
 [red-team prompt](templates/red_team_prompt.md). JSON structure is specified in
 [the schema](schemas/fact_check.schema.json), with procedures and field meanings

@@ -255,6 +255,45 @@ class TestBuildSourceMap(unittest.TestCase):
 
 
 class TestDisplayNumbersAndBibliography(unittest.TestCase):
+    def test_markdown_sources_are_separate_and_urls_survive_paper_delivery(self):
+        from pathlib import Path
+        sys.path.insert(0, str(Path(SCRIPT).parent))
+        from validate_report import bibliography_presentation_errors
+        with tempfile.TemporaryDirectory() as d:
+            run_cm('init-run', '--out-dir', d, '--query', 'test')
+            sources = [
+                {'raw_url': 'https://example.com/study_(final)?version=2&lang=en#results',
+                 'title': 'Étude [finale] & results', 'authors': ['A. Author'], 'year': '2026'},
+                {'raw_url': 'https://example.org/full/report', 'title': 'Second source'},
+            ]
+            for source in sources:
+                run_cm('register-source', '--json', json.dumps(source),
+                       '--dir', os.path.join(d, 'acquisition'))
+            bibliography = run_cm('export-bibliography', '--dir', d)
+            entries = bibliography.strip().split('\n\n')[1:]
+            self.assertEqual(len(entries), 2)
+            self.assertTrue(all(len(entry.splitlines()) == 1 for entry in entries))
+            for number, (entry, source) in enumerate(zip(entries, sources), 1):
+                self.assertTrue(entry.startswith(f'[{number}] '))
+                self.assertIn(f'](<{source["raw_url"]}>)', entry)
+                self.assertIn(f'URL: <{source["raw_url"]}>', entry)
+            self.assertIn(r'Étude \[finale\] &amp; results', entries[0])
+            self.assertEqual(bibliography_presentation_errors(bibliography), [])
+            # Exercise actual rendered output when the local renderer is present.
+            import html
+            import re
+            import shutil
+            if shutil.which('pandoc'):
+                rendered = subprocess.run(['pandoc', '-f', 'gfm', '-t', 'html', '--wrap=none'],
+                                          input=bibliography, capture_output=True, text=True, check=True).stdout
+                paragraphs = re.findall(r'<p>(.*?)</p>', rendered, re.S)
+                self.assertEqual(len(paragraphs), 2)
+                for paragraph, source in zip(paragraphs, sources):
+                    visible = html.unescape(re.sub(r'<[^>]+>', '', paragraph))
+                    self.assertIn(source['title'], visible)
+                    self.assertIn(source['raw_url'], visible)
+                    self.assertIn(f'href="{html.escape(source["raw_url"], quote=True)}"', paragraph)
+
     def test_prefers_corpus_over_acquisition(self):
         with tempfile.TemporaryDirectory() as d:
             run_cm('init-run', '--out-dir', d, '--query', 'test')

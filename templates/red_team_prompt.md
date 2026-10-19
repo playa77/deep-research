@@ -13,6 +13,11 @@ tables, captions, footnotes, bibliography metadata and factual premises inside
 recommendations or speculation. Compare against the coverage rows and atomic
 claims. Approve coverage only after inspecting every disposition and checking
 bibliography numbers against actual titles, URLs and source identities.
+Read the report as a paper reader too: challenge verdicts that omit their
+actual outcome, reason or uncertainty, or merely point to a QA file. Confirm
+in-report verification statements agree with the actual review findings.
+Check that each bibliography source renders separately and includes both a
+clickable page title and its complete visible URL, matching the reviewed source.
 
 For EVERY claim and EVERY evidence link:
 

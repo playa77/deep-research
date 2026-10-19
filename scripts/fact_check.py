@@ -327,8 +327,9 @@ def calculate(calc, evs):
 def verify(run, doc):
     validate_schema(doc)
     inputs, report, sources, evs, manifest = bundle(run)
-    from citation_manager import canonicalize_locator, compute_source_id
+    from citation_manager import bibliography_title_link, canonicalize_locator, compute_source_id
     from evidence_store import compute_evidence_id
+    from validate_report import bibliography_presentation_errors, verdict_presentation_errors
     for source in sources.values():
         validate_schema(source, 'corpus.schema.json')
         if source['source_id'] != compute_source_id(source['canonical_locator']):
@@ -353,7 +354,7 @@ def verify(run, doc):
         validate_schema(ev, 'evidence.schema.json')
         if ev['evidence_id'] != compute_evidence_id(ev['source_id'], ev['quote'], ev.get('locator')):
             raise ContractError('evidence identity hash mismatch')
-    errors = []
+    errors = verdict_presentation_errors(report)
 
     def require(condition, message):
         if not condition:
@@ -442,22 +443,27 @@ def verify(run, doc):
     eligible = [s for s in sources.values() if s.get('triage_status') != 'dropped']
     display = {n: s for n, s in enumerate(eligible, 1)}
     bib = {}
+    bib_lines = []
     in_bib = False
     for line in report.splitlines():
         heading = re.match(r'^#{1,6}\s+(.+?)\s*#*$', line)
         if heading:
             in_bib = heading.group(1).strip().lower() == 'bibliography'
-        elif in_bib and line.strip():
+        elif in_bib:
+            bib_lines.append(line)
             m = re.match(r'^\[(\d+)\]\s+(.+)$', line)
             if m:
                 n = int(m.group(1))
                 require(n not in bib, f'duplicate bibliography number {n}')
                 bib[n] = m.group(2)
+    errors.extend(bibliography_presentation_errors('\n'.join(bib_lines)))
     for n, text in bib.items():
-        require(n in display and display[n]['raw_url'] in re.findall(r'\]\(([^)]+)\)', text),
+        targets = [a or b for a, b in re.findall(r'\]\((?:<([^>\n]+)>|([^\s]+))\)', text)]
+        require(n in display and display[n]['raw_url'] in targets,
                 f'bibliography [{n}]: URL disagrees with corpus display map')
         if n in display:
-            require(f'[{display[n]["title"]}]({display[n]["raw_url"]})' in text,
+            require(bibliography_title_link(display[n]) in text or
+                    f'[{display[n]["title"]}]({display[n]["raw_url"]})' in text,
                     f'bibliography [{n}]: title/URL must match generated bibliography')
     require(bool(bib), 'no bibliography mapping')
 

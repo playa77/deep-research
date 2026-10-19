@@ -45,6 +45,7 @@ Display numbers are derived at render time from the curated corpus.
 
 import argparse
 import hashlib
+import html
 import json
 import os
 import re
@@ -474,6 +475,13 @@ def cmd_assign_display_numbers(args: argparse.Namespace) -> None:
     print(json.dumps(mapping, indent=2))
 
 
+def bibliography_title_link(source: dict) -> str:
+    """Keep titles literal and support full URLs containing parentheses."""
+    title = html.escape(' '.join(source.get('title', 'Untitled').split()), quote=False)
+    title = re.sub(r'([\\\[\]*_`])', r'\\\1', title)
+    return f'[{title}](<{source.get("raw_url", "")}>)'
+
+
 def cmd_export_bibliography(args: argparse.Namespace) -> None:
     """Generate bibliography from the curated corpus."""
     sources_path = _resolve_sources_path(args.dir, args.sources)
@@ -495,9 +503,11 @@ def cmd_export_bibliography(args: argparse.Namespace) -> None:
                     author_str = f'{authors[0]} et al. '
 
             year_str = f'({src["year"]})' if src.get('year') else '(n.d.)'
-            title = src.get('title', 'Untitled')
             url = src.get('raw_url', '')
-            lines.append(f'[{i}] {author_str}{year_str}. [{title}]({url})')
+            lines.append(f'[{i}] {author_str}{year_str}. {bibliography_title_link(src)}. URL: <{url}>')
+            # Separate paragraphs survive Markdown rendering and printing;
+            # a single newline between sources would collapse into one block.
+            lines.append('')
         print('\n'.join(lines))
 
     elif style == 'json':

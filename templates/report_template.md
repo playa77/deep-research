@@ -9,6 +9,9 @@ CITATION TRACKING: maintain the running citation list while drafting. Every
 factual claim carries [N] in the same sentence. The Bibliography is generated
 from the curated corpus via citation_manager.py export-bibliography and must
 contain every cited source — no gaps, no ranges, no placeholders.
+Each source occupies its own entry line, separated by a blank line so Markdown
+renders separate paragraphs. Keep the clickable page title AND display the
+complete URL after it; hidden link destinations do not survive paper delivery.
 
 STANDARDS: prose-first (≥80%), precision ("reduced mortality 23% (p<0.01)",
 never "significantly improved"), fact vs synthesis distinguished ("According
@@ -18,6 +21,10 @@ addressing X"), speculation labeled. No placeholder text of any kind.
 RELEASE: follow reference/fact-checking.md. Every assertion, including tables
 and methodological claims, needs atomic coverage and independent verifier +
 red-team review. Remove this instructional comment before final review.
+The report must stand alone on paper: write actual verdicts, reasons and
+remaining uncertainty in its prose and tables. QA paths are supplementary
+audit references, never substitutes for an outcome. Include these statements
+before freezing the report; never append a claimed gate pass after review.
 
 Section names below are required by scripts/validate_report.py — keep them.
 -->
@@ -26,6 +33,10 @@ Section names below are required by scripts/validate_report.py — keep them.
 
 (200–400 words. The decision-grade distillation: findings with numbers,
 confidence, and the "so what". Written last-quality-pass, placed first.)
+
+**Verdict:** (State the evidence-based conclusion, why it follows, and its main
+qualification in plain language. Never substitute "see qa/fact_check_result.json"
+or another file reference for the verdict.)
 
 ## Introduction
 
@@ -57,8 +68,11 @@ steelmanned, each cited to evidence. What would change our mind.
 
 ## Claims-Evidence Table
 
-(Audit summary; full records are in qa/fact_check.json.) Major claim → evidence_ids → independence groups →
-verification/red-team verdicts and residual uncertainty. The audit bridge between report and ledger.
+(A self-contained audit summary.) For every major claim, show the claim in
+plain language, cited sources [N] and evidence locators, independence groups,
+the actual verifier verdict and reason, the actual red-team verdict and reason,
+and residual uncertainty. Evidence IDs and QA paths may supplement these
+results; a reader must understand each outcome without opening another file.
 
 ## Limitations & Caveats
 
@@ -74,8 +88,10 @@ support it. No recommendation without evidence.)
 ## Bibliography
 
 <!-- Generated: python scripts/citation_manager.py export-bibliography --dir <run>
-Format: [N] Author/Org (Year). "Title". Publication. URL (Retrieved: Date)
-EVERY citation used in the body, individually listed. -->
+Format: [N] Author/Org (Year). [Page title](<full URL>). URL: <full URL>
+EVERY citation used in the body, individually listed on its own entry line.
+Separate entries with a blank line; preserve the full URL including path,
+query and fragment. Long URLs may wrap naturally on paper. -->
 
 ## Methodology Appendix
 
@@ -83,4 +99,6 @@ EVERY citation used in the body, individually listed. -->
 discovered → selected —, evidence counts, delta-acquisition waves, validation
 results, real independent reviewer session references, limitations of the
 verification, and outline adaptations with their evidence-driven rationale.
+Describe which checks passed, failed or remain unreviewed and explain the
+findings in the report itself. A pointer to a JSON file is not a verdict.
 A contract pass checks audit requirements; it does not prove all claims true.)
