@@ -137,7 +137,12 @@ year from training data.
    `--choice same-session` or `--choice new-session` before step 5. See the
    boundary reference for checks, recovery and resuming later phases.
 5. **Triage**: `python scripts/triage.py run --run-dir <run> --mode <mode>`.
-   Exit 2 = coverage gaps → run one delta-acquisition wave on gap angles, merge, re-run.
+   Exit 2 = inspect `triage/triage_result.json`: resolve corpus-cap constraints
+   first; genuine source shortfalls permit one targeted delta-acquisition wave
+   total (≤3 searches / ≤3 fetches per affected angle). Log the attempt before
+   dispatch; merge, rebuild the source map and rerun with unchanged settings.
+   Follow `reference/triage.md`; never lower quality or coverage requirements
+   to clear a gap. Disclose remaining shortfalls accurately.
 6. **Evidence** (`reference/evidence-engine.md`): read only curated corpus +
    raw files; persist every quote/locatable span with
    `python scripts/evidence_store.py add --dir <run>/evidence --json '{...}'`.
