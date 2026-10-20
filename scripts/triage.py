@@ -16,7 +16,8 @@ CLI subcommands:
   gaps      Compare planned angles against freshly selected sources
   run       Execute the full sequence; write corpus, report, and JSON result
 
-All subcommands are deterministic and stdlib-only, so triage can be re-run
+All subcommands are deterministic and local (review schemas use jsonschema),
+so triage can be re-run
 cheaply after delta-acquisition without losing decisions (re-running `run`
 recomputes from scratch; overrides file preserves manual group assignments).
 """
@@ -103,7 +104,7 @@ def title_ratio(a: str, b: str) -> float:
     return difflib.SequenceMatcher(None, normalize_title(a), normalize_title(b)).ratio()
 
 
-def raw_body_text(run_dir: str, raw_file: str | None, limit: int = 8000) -> str:
+def raw_body_text(run_dir: str, raw_file: str | None, limit: int | None = 8000, normalize: bool = True) -> str:
     """Return normalized body text of a raw acquisition file (frontmatter stripped)."""
     if not raw_file:
         return ''
@@ -119,13 +120,13 @@ def raw_body_text(run_dir: str, raw_file: str | None, limit: int = 8000) -> str:
     m = re.match(r'\A---\s*\n.*?\n---\s*\n', text, re.DOTALL)
     if m:
         text = text[m.end():]
-    text = text.lower()
-    text = re.sub(r'\s+', ' ', text).strip()
+    if normalize:
+        text = re.sub(r'\s+', ' ', text.lower()).strip()
     return text[:limit]
 
 
 def content_hash(text: str) -> str:
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
 
 def load_sources(run_dir: str) -> list[dict]:
@@ -185,73 +186,77 @@ def plan_angle_aliases(run_dir: str) -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 def step_dedupe(sources: list[dict], run_dir: str) -> None:
-    """Attach duplicate_of / syndication_with / content_hash flags in place."""
-    by_id = {s['source_id']: s for s in sources}
+    """Only full, substantive content equality can remove a source.
+
+    Titles, URL slugs and near-duplicate bodies are review leads, never proof
+    that publishers share an origin. No transitive closure of guesses.
+    """
     bodies = {}
-    for s in sources:
-        body = raw_body_text(run_dir, s.get('raw_file'))
-        s['_body'] = body
-        s['content_hash'] = content_hash(body) if body else None
+    for source in sources:
+        for key in ('duplicate_of', 'syndication_with', 'lineage_with',
+                    'similarity_candidates', 'triage_status', 'selection_reason'):
+            source.pop(key, None)
+        body = raw_body_text(run_dir, source.get('raw_file'), limit=None, normalize=False)
+        bodies[source['source_id']] = body
+        source['content_hash'] = content_hash(body) if body else None
 
-    # 1. exact content duplicates
-    by_hash: dict[str, str] = {}
-    for s in sources:
-        h = s.get('content_hash')
-        if not h:
+    if len(bodies) != len(sources):
+        raise ValueError('duplicate source IDs; repair merged acquisition before triage')
+    by_hash = {}
+    # Prefer original material as representative, with a stable tie-break.
+    for source in sorted(sources, key=lambda s: (
+            -ORIGIN_RANK.get(s.get('origin'), 0.5), s['source_id'])):
+        body = bodies[source['source_id']]
+        # Identical access-denied messages and short snippets are not documents.
+        if len(body) < 200 or len(body.split()) < 40:
             continue
-        if h in by_hash:
-            s['duplicate_of'] = by_hash[h]
+        if body in by_hash:
+            source['duplicate_of'] = by_hash[body]
         else:
-            by_hash[h] = s['source_id']
+            by_hash[body] = source['source_id']
 
-    # 2. same canonical id (raw files repeated across agents)
-    seen_ids: dict[str, str] = {}
-    for s in sources:
-        sid = s['source_id']
-        if sid in seen_ids and not s.get('duplicate_of'):
-            s['duplicate_of'] = seen_ids[sid]
-        else:
-            seen_ids[sid] = sid
-
-    # 3. syndication: same/similar title or same slug across different domains
-    trivial = {'', 'untitled', 'home', 'news', 'article', 'blog'}
     for i, a in enumerate(sources):
-        if a.get('duplicate_of') or not a.get('title') or a['title'].lower() in trivial:
-            continue
         for b in sources[i + 1:]:
-            if b.get('duplicate_of') or not b.get('title') or b['title'].lower() in trivial:
-                continue
-            if a.get('syndication_with') and a['source_id'] in (b.get('syndication_with') or []):
+            if a.get('duplicate_of') or b.get('duplicate_of'):
                 continue
             if registrable_domain(a['raw_url']) == registrable_domain(b['raw_url']):
-                continue  # same site handled by cluster step, not syndication
-            slug_match = (
-                url_slug(a['raw_url']) and url_slug(a['raw_url']) == url_slug(b['raw_url'])
-            )
-            title_match = title_ratio(a['title'], b['title']) >= TITLE_SIMILARITY_THRESHOLD
-            if slug_match or title_match:
-                a.setdefault('syndication_with', []).append(b['source_id'])
-                b.setdefault('syndication_with', []).append(a['source_id'])
+                continue
+            title_match = (normalize_title(a.get('title', '')) and
+                           title_ratio(a.get('title', ''), b.get('title', '')) >= TITLE_SIMILARITY_THRESHOLD)
+            slug_match = url_slug(a['raw_url']) and url_slug(a['raw_url']) == url_slug(b['raw_url'])
+            if title_match or slug_match:
+                a.setdefault('similarity_candidates', []).append(b['source_id'])
+                b.setdefault('similarity_candidates', []).append(a['source_id'])
 
-    # transitive syndication closure
-    changed = True
-    while changed:
-        changed = False
-        for s in sources:
-            linked = set(s.get('syndication_with') or [])
-            for peer_id in list(linked):
-                peer = by_id.get(peer_id)
-                if peer:
-                    new = (peer.get('syndication_with') or set()) if isinstance(
-                        peer.get('syndication_with'), set) else set(peer.get('syndication_with') or [])
-                    if not new <= linked:
-                        linked |= new
-                        changed = True
-            if linked:
-                s['syndication_with'] = sorted(linked)
-
-    for s in sources:
-        s.pop('_body', None)
+    # Optional substantive lineage review, bound to the exact extracted files.
+    from pathlib import Path
+    from fact_check import inside, load_json, sha, validate_schema, require
+    run = Path(run_dir).resolve()
+    path = run / 'triage/lineage.json'
+    if path.exists():
+        reviews = load_json(inside(run, 'triage/lineage.json'))
+        validate_schema(reviews, 'lineage.schema.json')
+        by_id = {s['source_id']: s for s in sources}
+        seen_pairs = set()
+        for review in reviews:
+            ids = review['source_ids']
+            pair = tuple(sorted(ids))
+            require(pair not in seen_pairs, 'duplicate/conflicting lineage review')
+            seen_pairs.add(pair)
+            require(ids[0] != ids[1] and set(ids) <= by_id.keys(), 'unknown/self lineage link')
+            for sid in ids:
+                raw = inside(run, 'acquisition/' + by_id[sid]['raw_file']).read_bytes()
+                require(sid in review['raw_sha256'] and sid in review['passages'],
+                        f'{sid}: incomplete lineage review')
+                require(sha(raw) == review['raw_sha256'][sid], f'{sid}: stale lineage review')
+                text = raw.decode('utf-8')
+                frontmatter = re.match(r'\A---\s*\n.*?\n---\s*\n', text, re.DOTALL)
+                body = text[frontmatter.end():] if frontmatter else text
+                require(review['passages'][sid] in body,
+                        f'{sid}: lineage passage missing from source body')
+            if review['relation'] == 'shared_origin':
+                for sid, peer in ((ids[0], ids[1]), (ids[1], ids[0])):
+                    by_id[sid].setdefault('lineage_with', []).append(peer)
 
 
 def step_cluster(sources: list[dict], run_dir: str) -> None:
@@ -286,9 +291,9 @@ def step_cluster(sources: list[dict], run_dir: str) -> None:
             else:
                 by_domain[d] = s['source_id']
 
-    # syndication -> same group
+    # Reviewed lineage and exact duplicate content -> same group
     for s in sources:
-        for peer in s.get('syndication_with') or []:
+        for peer in (s.get('lineage_with') or []) + ([s['duplicate_of']] if s.get('duplicate_of') else []):
             if peer in by_id:
                 union(s['source_id'], peer)
 
@@ -339,47 +344,8 @@ def step_select(sources: list[dict], run_dir: str, max_sources: int,
             s['triage_status'] = 'dropped'
             s['selection_reason'] = f"exact duplicate of {s['duplicate_of']}"
 
-    # Syndication clusters (same underlying story) keep ONE representative —
-    # the highest-ranked by origin, then credibility. NOTE: same-domain
-    # sources without syndication lineage are NOT derivative copies; they
-    # share an independence group for corroboration counting, but both stay
-    # in the corpus.
-    parent: dict[str, str] = {}
-
-    def find(x: str) -> str:
-        parent.setdefault(x, x)
-        while parent[x] != x:
-            parent[x] = parent[parent[x]]
-            x = parent[x]
-        return x
-
-    def union(a: str, b: str) -> None:
-        ra, rb = find(a), find(b)
-        if ra != rb:
-            parent[rb] = ra
-
-    for s in sources:
-        if s.get('triage_status'):
-            continue
-        for peer in s.get('syndication_with') or []:
-            union(s['source_id'], peer)
-
-    clusters: dict[str, list[dict]] = {}
-    for s in sources:
-        if s.get('triage_status'):
-            continue
-        clusters.setdefault(find(s['source_id']), []).append(s)
-    for members in clusters.values():
-        if len(members) == 1:
-            continue
-        members.sort(key=lambda s: (ORIGIN_RANK.get(s.get('origin') or 'secondary', 0.5),
-                                    s.get('credibility') or 0), reverse=True)
-        rep = members[0]
-        for m in members[1:]:
-            m['triage_status'] = 'dropped'
-            m['selection_reason'] = (
-                f"syndicated/derivative of {rep['source_id']} "
-                f"(same underlying story)")
+    # Shared origin affects corroboration counting, not whether a document
+    # contains useful or unique evidence. Keep nonidentical derivatives.
 
     def priority(s: dict) -> float:
         return (ORIGIN_RANK.get(s.get('origin') or 'secondary', 0.5)
@@ -497,13 +463,15 @@ def write_report(sources: list[dict], gaps: list[dict], run_dir: str,
         '## Duplication & Syndication', '',
     ]
     dupes = [s for s in sources if s.get('duplicate_of')]
-    synd = [s for s in sources if s.get('syndication_with') and not s.get('duplicate_of')]
+    synd = [s for s in sources if s.get('lineage_with')]
+    candidates = [s for s in sources if s.get('similarity_candidates')]
     lines.append(f'- Exact duplicates: {len(dupes)}')
     for s in dupes:
         lines.append(f'  - {s["source_id"]} ({s.get("title", "")[:60]}) → {s["duplicate_of"]}')
-    lines.append(f'- Syndication clusters: {len(synd)} sources share origin material')
+    lines.append(f'- Reviewed shared-origin links: {len(synd)} sources')
+    lines.append(f'- Title/slug similarity leads: {len(candidates)} sources (no deletion or group merge)')
     for s in synd[:20]:
-        lines.append(f'  - {s["source_id"]} ({s.get("title", "")[:60]}) ↔ {", ".join(s["syndication_with"])}')
+        lines.append(f'  - {s["source_id"]} ({s.get("title", "")[:60]}) ↔ {", ".join(s["lineage_with"])}')
     lines += ['', '## Independence Groups (selected)', '']
     for gid, count in sorted(groups.items(), key=lambda kv: -kv[1]):
         lines.append(f'- {gid}: {count} source(s)')
@@ -549,6 +517,14 @@ def write_report(sources: list[dict], gaps: list[dict], run_dir: str,
 
 def run_triage(run_dir: str, mode: str, max_sources: int | None,
                min_per_angle: int) -> dict:
+    from pathlib import Path
+    from fact_check import output_path, require
+    result_path = output_path(Path(run_dir).resolve(), 'triage/triage_result.json')
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.write_text(json.dumps({'status': 'blocked', 'error': 'triage has not completed'}) + '\n')
+    if not load_plan_angles(run_dir):
+        raise ValueError('missing or empty planned angles; coverage cannot be assessed')
+    input_digest = triage_input_digest(run_dir)
     sources = load_sources(run_dir)
     step_dedupe(sources, run_dir)
     step_cluster(sources, run_dir)
@@ -556,6 +532,7 @@ def run_triage(run_dir: str, mode: str, max_sources: int | None,
     cap = max_sources if max_sources is not None else DEFAULT_MAX_SOURCES.get(mode, 40)
     step_select(sources, run_dir, cap, min_per_angle=min_per_angle)
     gaps = step_gaps(sources, run_dir, min_per_angle)
+    require(triage_input_digest(run_dir) == input_digest, 'triage inputs changed during processing')
 
     # write corpus (all sources with triage fields, selected first)
     corpus_path = os.path.join(run_dir, 'triage', 'corpus.jsonl')
@@ -582,15 +559,59 @@ def run_triage(run_dir: str, mode: str, max_sources: int | None,
         'status': 'coverage_gaps' if gaps else 'ok',
         'discovered': len(sources), 'counts': counts,
         'gaps': gaps, 'corpus': corpus_path, 'report': report_path,
+        'lineage_policy': 'full_content_duplicates_only; reviewed_shared_origins_retain_unique_material',
+        'similarity_candidate_sources': sum(bool(s.get('similarity_candidates')) for s in sources),
         'max_sources': cap, 'minimum_per_angle': min_per_angle,
         'coverage_capacity': {'minimum_required_sources': required,
                               'sufficient': cap >= required},
         'result': result_path,
+        'inputs_sha256': input_digest,
     }
     with open(result_path, 'w', encoding='utf-8') as f:
         json.dump(result, f, indent=2, ensure_ascii=False)
         f.write('\n')
     return result
+
+
+def triage_input_digest(run_dir: str) -> str:
+    """Bind diagnostics to the plan, source registry, raw material and reviews."""
+    from pathlib import Path
+    from fact_check import digest, inside, sha
+    run = Path(run_dir).resolve()
+    names = {'acquisition/sources.jsonl', 'acquisition/query_plan.md'}
+    for source in load_sources(run_dir):
+        if source.get('raw_file'):
+            names.add('acquisition/' + source['raw_file'])
+    for relative in ('triage/lineage.json', 'triage/overrides.json'):
+        if (run / relative).exists():
+            names.add(relative)
+    return digest({name: sha(inside(run, name).read_bytes()) for name in sorted(names)})
+
+
+def begin_delta(run_dir: str) -> dict:
+    """Reserve the single triage wave on disk BEFORE any dispatch."""
+    from pathlib import Path
+    from fact_check import inside, load_json, output_path, require
+    from search_quality import check_acquisition
+    run = Path(run_dir).resolve()
+    result = load_json(inside(run, 'triage/triage_result.json'))
+    require(result.get('inputs_sha256') == triage_input_digest(run_dir),
+            'stale triage result; rerun triage before considering delta acquisition')
+    require(result['coverage_capacity']['sufficient'], 'resolve corpus capacity before dispatch')
+    targets = [g['angle'] for g in result['gaps'] if g['next_action'] == 'delta_acquisition']
+    require(targets, 'no genuine acquisition shortfalls to dispatch')
+    check_acquisition(run, read_jsonl(str(inside(run, 'acquisition/query_log.jsonl'))),
+                      load_plan_angles(run_dir))
+    attempt = {'status': 'attempt_reserved', 'reserved_at': now_iso(), 'angles': targets,
+               'max_searches_per_angle': 3, 'max_fetches_per_angle': 3,
+               'triage_inputs_sha256': result['inputs_sha256']}
+    path = output_path(run, 'triage/delta_attempt.json')
+    # O_EXCL makes retries, interrupted dispatch and new sessions consume the
+    # same attempt. Never remove this file to manufacture a fresh budget.
+    with open(path, 'x', encoding='utf-8') as stream:
+        json.dump(attempt, stream, indent=2, ensure_ascii=False)
+        stream.write('\n')
+    return attempt
 
 
 # ---------------------------------------------------------------------------
@@ -609,6 +630,9 @@ def main() -> None:
         prog='triage',
         description='Source triage between acquisition and evidence phases')
     sub = parser.add_subparsers(dest='command', required=True)
+
+    delta = sub.add_parser('begin-delta', help='Reserve the single triage-triggered acquisition wave')
+    delta.add_argument('--run-dir', required=True)
 
     for name, help_txt in [
         ('dedupe', 'Flag duplicates and syndication'),
@@ -630,6 +654,10 @@ def main() -> None:
         p.add_argument('--min-per-angle', type=positive_int, default=DEFAULT_MIN_PER_ANGLE)
 
     args = parser.parse_args()
+
+    if args.command == 'begin-delta':
+        print(json.dumps(begin_delta(args.run_dir), indent=2))
+        return
 
     if args.command == 'run':
         result = run_triage(args.run_dir, args.mode, args.max_sources, args.min_per_angle)
@@ -666,4 +694,8 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(json.dumps({'status': 'blocked', 'error': str(exc)}))
+        sys.exit(1)

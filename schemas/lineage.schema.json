@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Reviewed source lineage",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["source_ids", "relation", "reviewer", "reason", "raw_sha256", "passages"],
+    "properties": {
+      "source_ids": {"type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": {"type": "string"}},
+      "relation": {"enum": ["shared_origin", "independent"]},
+      "reviewer": {"type": "string", "pattern": "\\S"},
+      "reason": {"type": "string", "pattern": "\\S"},
+      "raw_sha256": {"type": "object", "minProperties": 2, "maxProperties": 2, "additionalProperties": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+      "passages": {"type": "object", "minProperties": 2, "maxProperties": 2, "additionalProperties": {"type": "string", "pattern": "\\S"}}
+    },
+    "additionalProperties": false
+  }
+}

@@ -1,7 +1,7 @@
 ---
 name: deep-research
 description: Wide multi-source research with a durable evidence trail.
-version: 0.3.0
+version: 0.4.0
 author: Daniel (playa77), Hermes Agent
 license: MIT
 platforms: [linux, macos, windows]
@@ -29,6 +29,18 @@ Two properties matter more than any single step:
   resumed by a fresh session from `run_manifest.json` + the bundle.
 - **"Did the source say X" ≠ "is X true".** Quote verification (check 1) and
   source-accuracy and inference review (checks 2–7) are separate final-QA gates.
+
+## Acquisition quality comes before handoff
+
+Read **[reference/search-quality.md](reference/search-quality.md)** before
+acquisition and processing. Plan indispensable native search routes, persist
+all search responses and actual executions, test known-item controls for
+negatives, and repair failed routes during gathering. Error/blocked/inconclusive
+searches cannot establish absence or satisfy a countersearch. Run
+`search_quality.py --run-dir <run>` before declaring gathering complete.
+The handoff runs this gate again, saves unresolved searches, and binds the
+workflow version and search responses. Neither saturation nor a source count
+establishes that the research question has been adequately investigated.
 
 ## Mandatory fact-checking contract
 
@@ -137,10 +149,16 @@ year from training data.
    `--choice same-session` or `--choice new-session` before step 5. See the
    boundary reference for checks, recovery and resuming later phases.
 5. **Triage**: `python scripts/triage.py run --run-dir <run> --mode <mode>`.
+   Read `reference/triage.md` before this step. Title/slug matches are review
+   leads only; only full content duplicates are removed. Reviewed shared origins
+   affect corroboration groups while retaining unique material.
    Exit 2 = inspect `triage/triage_result.json`: resolve corpus-cap constraints
-   first; genuine source shortfalls permit one targeted delta-acquisition wave
-   total (≤3 searches / ≤3 fetches per affected angle). Log the attempt before
-   dispatch; merge, rebuild the source map and rerun with unchanged settings.
+   first; check search quality and actual source dispositions before deciding
+   that gathering is insufficient. Genuine source shortfalls permit one
+   targeted delta-acquisition wave total (≤3 searches / ≤3 fetches per affected angle). Log the attempt before
+   dispatch using `triage.py begin-delta --run-dir <run>`; the durable attempt
+   survives resumption and interrupted dispatch. Merge, rebuild the source map
+   and rerun with unchanged settings.
    Follow `reference/triage.md`; never lower quality or coverage requirements
    to clear a gap. Disclose remaining shortfalls accurately.
 6. **Evidence** (`reference/evidence-engine.md`): read only curated corpus +
@@ -219,7 +237,9 @@ Schemas in `schemas/` define every JSONL row and the manifest.
   in the gathering task. A handoff check is not a source or claim review.
 - Five articles from one wire story are one source. Triangulation counts
   independence groups (`independence_group_id`), never raw rows.
-- Never fabricate a citation. Write "No sources found for X" instead.
+- Never fabricate a citation or infer absence from a failed query. Report
+  a scoped zero-result search only with a functioning known-item control;
+  otherwise state precisely what could not be searched or established.
 - Don't re-search during phases 4–8; only sanctioned delta-acquisition loops
   (steps 5, 9, 10) may search, and they append to the same bundle.
 - Validators are deterministic. Drafting aids can be re-run; final review
@@ -246,6 +266,8 @@ Schemas in `schemas/` define every JSONL row and the manifest.
   and schema spec)
 - `reference/session-boundary.md` — mandatory gathering stop, session choice,
   checked handoff and processing resume
+- `reference/search-quality.md` — search execution, known-item controls, native
+  search coverage, failure recovery and checks before handoff/release
 - `reference/acquisition.md` — phases 1–2: planning, agent prompt templates, budgets
 - `reference/triage.md` — phase 3 protocol and scoring rules
 - `reference/evidence-engine.md` — phases 4–5: evidence, claims, triangulation

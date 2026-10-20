@@ -218,6 +218,35 @@ class TestMergeQueryLog(unittest.TestCase):
         self.assertTrue(all(r['query_id'].startswith('q_') for r in rows))
         self.assertTrue(all(r['ts'] for r in rows))
 
+    def test_repeated_query_executions_are_retained_and_merge_stays_idempotent(self):
+        path = os.path.join(self.agents, 'agent.queries.jsonl')
+        attempts = [dict(query_text='same catalogue query', tool='native-search',
+                         execution_ref='synthetic-call-' + str(i),
+                         ts='2026-10-19T00:00:00Z',
+                         outcome=outcome) for i, outcome in enumerate(('error', 'results'))]
+        with open(path, 'w') as stream:
+            stream.write(''.join(json.dumps(q) + '\n' for q in attempts))
+        first = run_cm('merge-query-log', '--acq-dir', self.acq)
+        self.assertEqual(first['added'], 2)
+        second = run_cm('merge-query-log', '--acq-dir', self.acq)
+        self.assertEqual(second['added'], 0)
+        with open(os.path.join(self.acq, 'query_log.jsonl')) as stream:
+            queries = [json.loads(line) for line in stream]
+        self.assertEqual([q['outcome'] for q in queries], ['error', 'results'])
+        self.assertEqual(len({q['query_id'] for q in queries}), 2)
+
+    def test_conflicting_outcomes_for_one_execution_are_not_silently_skipped(self):
+        path = os.path.join(self.agents, 'agent.queries.jsonl')
+        query = dict(query_text='catalogue query', tool='native-search',
+                     execution_ref='synthetic-call', ts='2026-10-19T00:00:00Z', outcome='error')
+        with open(path, 'w') as stream:
+            stream.write(json.dumps(query) + '\n')
+        run_cm('merge-query-log', '--acq-dir', self.acq)
+        with open(path, 'w') as stream:
+            stream.write(json.dumps(dict(query, outcome='results')) + '\n')
+        with self.assertRaisesRegex(RuntimeError, 'conflicting records'):
+            run_cm('merge-query-log', '--acq-dir', self.acq)
+
 
 class TestBuildSourceMap(unittest.TestCase):
     def test_map_includes_angles_raw_and_agents(self):

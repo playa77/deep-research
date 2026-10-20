@@ -8,6 +8,10 @@
 
 # Phases 1–2: Scope & Plan → Acquire
 
+Read [search-quality.md](search-quality.md) before planning or dispatch.
+Acquisition includes checking whether search routes work, testing negative
+results and repairing failed retrievals. Those checks belong before handoff.
+
 Phase 1 borrows 199-biotech's scoping epistemology; phase 2 is the
 standardhuman acquisition engine ported to Hermes tools. The output of this
 file is the acquisition bundle (`reference/contract.md`).
@@ -68,7 +72,8 @@ developments (date-filtered to the year obtained in step 0) — 4. academic —
 industry/practitioner analysis — 8. failure modes & limitations.
 
 For each angle: name (slug), rationale, seed queries (3–5), target source
-types, and which hypothesis it can confirm/disconfirm. Hunt for primary-source
+types, indispensable native search surfaces (`required_search_surfaces`),
+known-item controls and spelling/date/collection variants, and which hypothesis it can confirm/disconfirm. Hunt for primary-source
 classes early: registries, filings, datasets, official statistics, court
 records, standards bodies.
 
@@ -84,6 +89,7 @@ triage parses for gaps:
     {"id": "angle-01", "name": "official-statistics",
      "rationale": "...", "seed_queries": ["..."],
      "target_source_types": ["government", "academic"],
+     "required_search_surfaces": ["official-registry-native-search"],
      "tests_hypotheses": ["H1"]}
   ],
   "budgets": {"searches": 25, "fetches": 35, "agents": 8}
@@ -124,7 +130,8 @@ Tests hypotheses: <H-ids> — prioritize evidence that would confirm OR disconfi
 
 Tools: web_search for discovery, web_extract to fetch. For JS-heavy or
 bot-walled pages try the browser tools; if a page blocks extraction, log it
-and move on — do not fight it.
+and try a permitted documented alternative within budget. Record unresolved
+access failures honestly; they are not negative results.
 
 Budget: max <S> searches, max <F> fetches. Spend them on DIVERSE material:
 aim for primary sources (official records, datasets, filings, first
@@ -142,9 +149,19 @@ Persist as you go (do not hold results in memory):
    raw_url, title, origin (primary|secondary|tertiary), medium
    (web|academic|documentation|code|news|government|book), published,
    retrieved, publisher, search_angle, discovered_by, raw_file, retrieval_record
-3. Append one JSON line per search to
-   <run>/acquisition/agents/<your-id>.queries.jsonl:
-   query_text, tool, search_angle, result_count, top_urls, notes
+3. Append one JSON line per actual search execution (including controls/retries)
+   to <run>/acquisition/agents/<your-id>.queries.jsonl, conforming to
+   query_log.schema.json: query_text, tool, actual ts, search_angle, result_count,
+   top_urls, notes, outcome, query_role, search_surface, search_scope,
+   search_session, actual execution_ref, response_file and response_sha256.
+   Save the unchanged search response separately for each execution.
+   Use results | no_results | error | blocked | inconclusive. Errors and failed
+   controls are inconclusive for absence. A no_results row needs control_query_id
+   linking a successful known-item positive_control on the same tool, native
+   surface, filters/collection scope and access session; controls need
+   expected_match actually recovered in their saved response. Failed routes need
+   a precise limitation. Read reference/search-quality.md and do this now;
+   processing must not discover that your negative searches never worked.
 4. Anything promising you could not chase: <your-id>.leads.jsonl rows
    {"lead","why","suggested_query"}
 
@@ -193,7 +210,17 @@ budget. Stop conditions, cheapest first: saturation → all angles covered →
 budget reached. If stopped on budget, note "what we would search next" in the
 query plan for a future resume.
 
-**Gate (phase complete)**: `sources.jsonl` non-empty; every angle has ≥1
+Before stopping, inspect raw search responses, required native routes, unresolved
+access failures and whether fetched material fits each requested source class.
+Repair broken route parameters, controls and extractions during acquisition.
+Source counts and saturation never substitute for completing essential work.
+Run `python scripts/search_quality.py --run-dir <run>` and review every unresolved
+search against the definition of done. An essential unanswered question blocks
+completion even when another query on the same angle ran successfully.
+
+**Gate (phase complete)**: search-quality check passes and required native search
+surfaces have usable executions; essential acquisition questions have usable
+material; `sources.jsonl` non-empty; every angle has ≥1
 fetched source or a logged dead-end explanation; every raw file has valid
 frontmatter; query log ≥ 1 row per angle; merge reports 0 malformed rows.
 

@@ -50,19 +50,36 @@ even when gaps exist. Use `run` for the persisted result and coverage exit code.
 
 ## What each step decides
 
-**Dedupe & syndication.** Exact duplicates (identical content hash or repeated
-canonical locator) are flagged `duplicate_of`. Same or near-identical titles
-(slug equality or title similarity ≥ 0.92) on different registrable domains
-are flagged as a syndication cluster — five republications of one wire story
-become one origin, not five.
+**Dedupe and lineage.** Only identical complete source bodies may be removed
+as duplicates. The comparison reads the whole body (not the first 8,000
+characters), preserves case and internal layout, and requires at least 200
+characters and 40 words to avoid treating short error messages/snippets as
+documents. Original material wins the representative tie-break, then stable
+source ID. Identical content counts as one origin even across domains.
 
-**Origin clustering.** Sources sharing a registrable domain or a syndication
-lineage get one `independence_group_id` (G001_example.com, ...). This group id
-is what triangulation counts in phase 5 — corroborating a claim with two
-sources from one group corroborates nothing. Manual corrections go in
-`triage/overrides.json` (`{"<source_id>": "G042_different_origin"}`), for cases
-deterministic clustering can't see (a wire story republished under different
-slugs, a consortium report mirrored on member sites).
+Matching titles (similarity ≥ 0.92) or URL slugs produce
+`similarity_candidates` for inspection only. A shared subject such as “Mink”
+is not syndication. Such matches never delete documents, merge independence
+groups or authorize new acquisition. Missing content is not duplication.
+
+**Origin clustering.** Same-domain sources share an independence group by
+default. Exact duplicates share a group across domains. Other shared-origin
+links require `triage/lineage.json`, an array conforming to
+`schemas/lineage.schema.json`. Each pair records `source_ids`, `relation`
+(`shared_origin` or `independent`), `reviewer`, substantive `reason`, and maps
+`raw_sha256` and `passages` keyed by both source IDs. Use full extracted-file
+hashes and exact body passages showing attribution or the reason for the
+judgment. Changed source files, unknown IDs, missing passages and conflicting
+pair reviews block triage. A matching title is not a substantive rationale.
+Independent review remains necessary; these local records are not truth proofs.
+
+Reviewed shared-origin links merge corroboration groups, **not corpus rows**.
+Nonidentical derivatives may contain useful added material; preserve them and
+let evidence review assess each passage. Multiple rows from one group still
+count as only one origin. `independent` records document the review; they do
+not automatically split domain-level groups or override transitive shared
+lineage. Legacy `overrides.json` group assignments remain for manual corrections,
+never source deletion; final reviewers must check their justification.
 
 **Credibility scoring.** `source_evaluator.py` (ported from 199-biotech)
 scores 0–100 from domain authority, recency, expertise, bias signals.
@@ -78,9 +95,9 @@ planned angle, then a second, up to `--min-per-angle`, always taking the
 best-ranked sources within each angle. Ranking breaks ties if capacity is
 insufficient. Remaining slots are filled by global rank, including eligible
 sources outside planned angles. Sources below the unchanged credibility
-threshold stay in reserve and consume no selected slots. Within syndication groups only the representative is kept —
-the best-ranked member, others dropped as derivative. Primary sources beat
-secondary write-ups of the same material by construction.
+threshold stay in reserve and consume no selected slots. Exact duplicate bodies
+keep one representative; nonidentical shared-origin sources remain eligible.
+Coverage counts rows; independent corroboration still counts reviewed origins.
 
 Coverage allocation can move a higher-ranked source to reserve to make room
 for an eligible source on an underrepresented angle. Every source and decision
@@ -103,7 +120,12 @@ Planned angle IDs and names resolve to the same angle; original source tags
 are preserved. Counts are selected sources, not proof of independent origins
 or claim support.
 
-On exit 2, read the structured result once and act on its diagnostics:
+On exit 2, read the structured result and its source decisions before dispatch.
+First check the current search-quality gate and inspect any dropped/reserve
+material relevant to the deficit. Fix erroneous metadata, extraction or lineage
+decisions from actual evidence and rerun triage; a local processing defect is
+not an acquisition shortage. Never infer a shortage from the exit code alone.
+Then act on the diagnostics:
 
 1. Check `coverage_capacity.sufficient`. If false, all planned minima cannot
    fit within the cap. Resolve capacity against the agreed research scope
@@ -111,9 +133,16 @@ On exit 2, read the structured result once and act on its diagnostics:
    coverage minimum, remove planned angles or change quality requirements.
 2. For `next_action: review_corpus_cap`, enough eligible sources for that
    angle already exist. Review capacity; another search wave cannot resolve
-   that constraint. Low-trust reserves and derivative copies do not count as
-   eligible alternatives.
-3. For `next_action: delta_acquisition`, run ONE targeted wave on those angles
+   that constraint. Low-trust reserves and exact duplicates do not count as eligible
+   alternatives. Nonidentical derivatives may contribute unique material but
+   never additional independent corroboration.
+3. For `next_action: delta_acquisition`, reserve the attempt with
+   `python scripts/triage.py begin-delta --run-dir <run>` BEFORE dispatch.
+   This checks the result against current source/plan/review inputs, checks
+   search quality and capacity, and exclusively creates
+   `triage/delta_attempt.json`. An existing attempt blocks another reservation,
+   including after a crash, re-triage or fresh session. Never delete it to reset
+   the budget. Then run ONE targeted wave on those angles
    only, using the same acquisition contract and budgets of at most 3 searches
    and 3 fetches per angle. `additional_sources_needed` is the shortfall in
    eligible sources, not a guarantee that this many fetches will suffice.
@@ -126,8 +155,9 @@ On exit 2, read the structured result once and act on its diagnostics:
    to resolve an unfamiliar field. Merge sources and query logs, rebuild the
    source map, then rerun triage with the original mode, cap and minimum.
 
-At most one triage-triggered wave in total; rerunning triage or resuming a
-session does not reset that budget. If coverage still falls short, retain the
+At most one triage-triggered wave in total; the durable reservation consumes
+the attempt even if dispatch is interrupted. Record actual execution counts
+in the plan/log and enforce the ≤3 search/fetch per-angle limits during dispatch. Rerunning triage or resuming a session does not reset that budget. If coverage still falls short, retain the
 gap and exit-2 result and document the precise limitation separately in the
 plan and final report. For one selected source, say coverage is limited to
 one source; do not say "No sources found". Documentation does not clear the

@@ -2,6 +2,7 @@
 never a method for generating real research review records.
 """
 from copy import deepcopy
+from search_fixtures import search_record
 import json
 from pathlib import Path
 import subprocess
@@ -68,11 +69,11 @@ class ContractFixture(unittest.TestCase):
         (self.run / 'run_manifest.json').write_text(json.dumps({'mode': 'standard'}), encoding='utf-8')
         rows(self.run / 'triage/corpus.jsonl', [self.source])
         rows(self.run / 'evidence/evidence.jsonl', [self.ev])
-        self.query = {'query_text': 'trial enrollment correction retraction discrepancy', 'tool': 'web_search',
-                      'query_id': 'q_test', 'agent': 'fixture-agent', 'ts': '2026-10-19T00:00:00Z',
-                      'search_angle': 'counterevidence', 'result_count': 0, 'top_urls': [],
-                      'notes': 'Synthetic search fixture, not a real search.'}
-        rows(self.run / 'acquisition/query_log.jsonl', [self.query])
+        control = search_record(self.run, 'q_control', angle='counterevidence',
+                                query_role='positive_control', expected_match='Synthetic known item')
+        self.query = search_record(self.run, 'q_test', angle='counterevidence',
+                                   outcome='no_results', control_query_id='q_control')
+        rows(self.run / 'acquisition/query_log.jsonl', [control, self.query])
         self.doc, warnings = fc.prepare(self.run)
         self.assertEqual(warnings, [])
         self.doc['author_id'] = 'writer'
@@ -121,6 +122,30 @@ class ContractTests(ContractFixture):
         result = fc.verify(self.run, self.doc)
         self.assertEqual(result['status'], 'contract_pass', result)
         self.assertIn('not proof of truth', result['assurance'])
+
+    def test_failed_search_cannot_satisfy_counterevidence_even_with_complete_reviews(self):
+        for outcome in ('error', 'blocked', 'inconclusive'):
+            with self.subTest(outcome=outcome):
+                query = dict(self.query, outcome=outcome,
+                             limitation='Synthetic failed search; absence was not established.')
+                rows(self.run / 'acquisition/query_log.jsonl', [query])
+                self.doc['inputs'] = fc.bundle(self.run)[0]
+                for review in self.doc['source_reviews']:
+                    review['inputs_sha256'] = fc.digest(self.doc['inputs'])
+                self.claim['countersearch_ids'] = [fc.digest(query)]
+                self.sign_claims()
+                self.blocked('unusable countersearch')
+
+    def test_known_item_control_cannot_substitute_for_a_challenge_search(self):
+        queries = fc.load_rows(self.run / 'acquisition/query_log.jsonl')
+        self.claim['countersearch_ids'] = [fc.digest(queries[0])]
+        self.sign_claims()
+        self.blocked('unusable countersearch')
+
+    def test_search_response_edit_invalidates_release_snapshot(self):
+        path = self.run / 'acquisition' / self.query['response_file']
+        path.write_text('Altered search results')
+        self.blocked('stale search response')
 
     def test_prepare_never_approves(self):
         doc, _ = fc.prepare(self.run)

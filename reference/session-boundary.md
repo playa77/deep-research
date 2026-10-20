@@ -38,11 +38,21 @@ python <skill>/scripts/session_handoff.py prepare --run-dir <run>
 ```
 
 The command checks the recorded task contract, source/query schemas, source
-identities, extracted text and original-response provenance/hashes. It writes
-`handoff/acquisition.json` (input hashes/counts) and
+identities, extracted text and original-response provenance/hashes. It also
+runs [search-quality.md](search-quality.md): working per-angle and required
+native-route executions, preserved query responses, and compatible successful
+known-item controls for every zero-result search. Failed/inconclusive queries
+cannot satisfy coverage. Review remaining failures against the definition of
+done; essential unanswered questions block acquisition completion. It writes
+`handoff/acquisition.json` (version-2 input hashes/counts, search-quality summary
+and workflow fingerprint) and
 `handoff/processing_prompt.md` (the bundled template with the run path), and
 sets `processing_handoff.status: awaiting_user`, `next_phase: triage`.
 It creates no triage decisions, evidence judgments, claims, reviews or report.
+Search-response hashes and the skill/scripts/schemas/references/templates
+fingerprint are checked on both preparation and resumption. Changed workflow
+files require explicit migration/repair, never silent continuation under old
+assumptions.
 An exit-0 handoff means the persisted inputs passed these mechanical checks;
 it does not establish coverage completeness, source truth or source suitability.
 The existing scope/acquisition gates still require review by the gathering agent.
@@ -57,7 +67,8 @@ to obtain a successful checkpoint.
 After successful preparation, give the user:
 
 - An information-gathering completion notice with source/query counts and
-  logged acquisition gaps or stop reasons. Do not present untested findings.
+  logged acquisition gaps, unresolved search executions and stop reasons.
+  Distinguish a genuinely searched zero from a broken or inaccessible route. Do not present untested findings.
 - The research run location and the **literal, copyable contents** of
   `handoff/processing_prompt.md`, not merely a link or an offer to provide it.
 - The question: **“Continue with information evaluation, analysis and the report
@@ -91,7 +102,9 @@ re-ask the initial continuation question. Use the supplied run directory as the
 root if the bundle moved; the acquisition snapshot uses relative file paths and
 excludes the old absolute `report_dir`. Preserve the original question and scope.
 
-Start at **phase 3, source triage**. Then execute every evidence, triangulation,
+Read `handoff/acquisition.json.search_quality` before starting. Do not treat
+failed searches or controls as evidence of absence. Read the triage reference
+before interpreting any coverage result. Start at **phase 3, source triage**. Then execute every evidence, triangulation,
 counterevidence, synthesis, critique and final-QA gate. Read source files as
 needed rather than loading the full corpus into the new context at once; persist
 evidence and claims progressively. Author continuation is not an independent
@@ -116,3 +129,8 @@ silently regenerate hashes to conceal changes. Keep `scope`/`acquire` marked
 complete only when their gates still hold. Legacy runs without a research
 contract must first recover their actual task context and artifacts; they
 are not silently accepted as ready for processing.
+
+Version-1 handoffs and older query logs are not silently upgraded. Recover
+actual saved responses, execution metadata and controls; archive the old
+snapshot and prepare version 2 only after the current checks pass. Do not
+manufacture missing search results, known items or reviews to migrate a bundle.

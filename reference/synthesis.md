@@ -41,7 +41,9 @@ order and contracts per `templates/report_template.md`:
   "significantly improved outcomes"; "5 RCTs (n=1,847) show", never "studies
   suggest".
 - Distinguish fact from synthesis: "According to [1]..." vs "This suggests...".
-- Admit gaps: "No sources found addressing X" — never fabricate a citation.
+- Admit gaps precisely: distinguish a bounded, working zero-result search
+  from an unsearched, blocked or inconclusive route. Neither proves universal
+  absence. Never fabricate a citation. Apply `search-quality.md`.
 - No placeholders, no "content continues", no truncated sections.
 - Paper delivery must stand alone. The Executive Summary states the actual
   conclusion, reason and uncertainty. Claims-Evidence Table verdicts state each

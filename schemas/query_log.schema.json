@@ -3,7 +3,22 @@
   "title": "QueryLogEntry",
   "description": "One executed search. Lives in acquisition/query_log.jsonl (merged) and per-agent fragments acquisition/agents/*.queries.jsonl. Search is disposable but the log is the audit trail of what was tried.",
   "type": "object",
-  "required": ["query_id", "query_text", "tool", "agent", "ts"],
+  "required": [
+    "query_id",
+    "query_text",
+    "tool",
+    "agent",
+    "ts",
+    "outcome",
+    "search_surface",
+    "search_scope",
+    "search_session",
+    "query_role",
+    "execution_ref",
+    "response_file",
+    "response_sha256",
+    "result_count"
+  ],
   "properties": {
     "query_id": {
       "type": "string",
@@ -27,26 +42,174 @@
       "description": "When the search ran"
     },
     "search_angle": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Slug of the planned angle this query served",
       "default": null
     },
     "result_count": {
-      "type": ["integer", "null"],
-      "description": "Number of results returned",
-      "default": null
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
     },
     "top_urls": {
-      "type": ["array", "null"],
-      "items": { "type": "string" },
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      },
       "description": "Top result URLs actually considered",
       "default": null
     },
     "notes": {
-      "type": ["string", "null"],
+      "type": [
+        "string",
+        "null"
+      ],
       "description": "Dead ends, rate limits, hostile pages, query variants worth retrying",
       "default": null
+    },
+    "outcome": {
+      "enum": [
+        "results",
+        "no_results",
+        "error",
+        "blocked",
+        "inconclusive"
+      ]
+    },
+    "query_role": {
+      "enum": [
+        "discovery",
+        "positive_control"
+      ]
+    },
+    "search_surface": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "search_scope": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "search_session": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "execution_ref": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "response_file": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "expected_match": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "limitation": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "control_query_id": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "response_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "results"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result_count": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "no_results"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "result_count": {
+            "const": 0
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "enum": [
+              "error",
+              "blocked",
+              "inconclusive"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "limitation"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "query_role": {
+            "const": "positive_control"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "expected_match"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "outcome": {
+            "const": "no_results"
+          },
+          "query_role": {
+            "const": "discovery"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "control_query_id"
+        ]
+      }
+    }
+  ]
 }
