@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from boundary_fixtures import processing_fixture
 
 SCRIPTS = os.path.join(os.path.dirname(__file__), '..', 'scripts')
 sys.path.insert(0, SCRIPTS)
@@ -23,6 +24,7 @@ class TriageFixture:
 
     def __init__(self, root: str):
         self.root = root
+        processing_fixture(root)
         for sub in ('acquisition/raw', 'acquisition/agents', 'triage', 'evidence', 'report', 'qa'):
             os.makedirs(os.path.join(root, sub), exist_ok=True)
         for name in ('acquisition/sources.jsonl', 'acquisition/query_log.jsonl',

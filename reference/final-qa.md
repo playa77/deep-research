@@ -1,5 +1,9 @@
 # Phase 8: Final QA and release
 
+This phase belongs exclusively to `deep-research-processing` after the user
+submits the handoff in a different host session. The gathering session can
+never perform QA or release its own run. Both skills remain read-only.
+
 The normative release procedure is [fact-checking.md](fact-checking.md).
 Read it in full. It applies in every mode. No failed check can be waived by
 disclosing it in Limitations. A report lacking completed checks is an

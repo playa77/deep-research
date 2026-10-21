@@ -98,10 +98,11 @@ complete. A successful query elsewhere does not answer an essential missing
 question. Budget exhaustion and saturation do not establish completeness.
 
 `session_handoff.py prepare/check/resume` runs these checks and binds all search
-responses, the quality summary and the workflow fingerprint in its version-2
+responses, the quality summary and the workflow fingerprint in its version-3
 snapshot. Present unresolved searches with the gathering-completion notice;
 the new session must read the summary before triage. Required routes with no
-usable searches block handoff. Identical checks apply to both session choices.
+usable searches block handoff. Processing requires the separate skill in a fresh host session; no same-session
+continuation exists.
 
 The final fact-check snapshot includes search responses. Only discovery rows
 with usable outcomes may satisfy `countersearch_ids`; controls, tool errors,

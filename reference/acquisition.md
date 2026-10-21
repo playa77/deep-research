@@ -231,6 +231,7 @@ stop reason, known gaps and next-search leads in the plan/log. After both gates
 are met, mark only `scope` and `acquire` complete, prepare the checked handoff
 with `session_handoff.py prepare`, and follow
 [session-boundary.md](session-boundary.md): offer the literal fresh-session
-prompt and same-session continuation, then end the turn and wait for the user.
+prompt, then end the turn. The user must open a fresh session with the
+separate deep-research-processing skill; processing here is forbidden.
 Do not run source triage, evaluate findings, decide hypotheses or draft a
 report in this task. Processing starts at phase 3 only after the user's choice.

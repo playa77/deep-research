@@ -40,6 +40,8 @@ def build_display_map(sources: list[dict]) -> dict[int, str]:
 
 
 def cmd_link(args: argparse.Namespace) -> None:
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir, args.run_dir, args.sources)
     claims_path = os.path.join(args.dir, 'claims.jsonl')
     if not os.path.exists(claims_path):
         print(json.dumps({'error': f'claims.jsonl not found in {args.dir}'}),

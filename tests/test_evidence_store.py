@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from boundary_fixtures import processing_fixture
 
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'evidence_store.py')
 
@@ -26,6 +27,7 @@ def run_es(*args: str) -> dict | list:
 class TestInit(unittest.TestCase):
     def test_creates_empty_file(self):
         with tempfile.TemporaryDirectory() as d:
+            processing_fixture(d)
             out = run_es('init', '--dir', d)
             self.assertEqual(out['status'], 'ok')
             path = os.path.join(d, 'evidence.jsonl')
@@ -36,6 +38,7 @@ class TestInit(unittest.TestCase):
 class TestAddEvidence(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         run_es('init', '--dir', self.tmpdir)
 
     def tearDown(self):
@@ -95,6 +98,7 @@ class TestAddEvidence(unittest.TestCase):
 class TestListAndExport(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         run_es('init', '--dir', self.tmpdir)
         # Add 3 evidence items from 2 sources
         for src, quote in [

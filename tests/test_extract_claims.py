@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from boundary_fixtures import processing_fixture
 
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'extract_claims.py')
 FIXTURES = os.path.join(os.path.dirname(__file__), 'fixtures')
@@ -63,6 +64,7 @@ Organizations should begin evaluating post-quantum cryptography solutions immedi
 class TestExtract(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         # Create empty claims.jsonl
         open(os.path.join(self.tmpdir, 'claims.jsonl'), 'w').close()
         # Write sample report
@@ -118,6 +120,7 @@ class TestExtract(unittest.TestCase):
 class TestAdd(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         open(os.path.join(self.tmpdir, 'claims.jsonl'), 'w').close()
 
     def tearDown(self):
@@ -151,6 +154,7 @@ class TestAdd(unittest.TestCase):
 class TestListAndStats(unittest.TestCase):
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         open(os.path.join(self.tmpdir, 'claims.jsonl'), 'w').close()
         # Add mixed claims
         for sec, text, ctype in [

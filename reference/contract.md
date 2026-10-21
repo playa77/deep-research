@@ -163,8 +163,8 @@ constraints and definition of done; it is required by the handoff check.
 
 **This is the mandatory gathering/processing stop**, before source triage.
 Follow [session-boundary.md](session-boundary.md) to prepare the checked
-handoff, show the fresh-session prompt and wait for the user's choice. A fresh
-session receives the same inputs as a same-session continuation; acquisition
+handoff, show the fresh-session prompt and end the turn. The user must submit
+it to deep-research-processing in a different host session; acquisition
 summaries never replace source material. A handoff check is not verification.
 
 ## Triage output (the evidence engine's input)
@@ -195,12 +195,15 @@ the same bundle and passes through the same triage.
 ## Resumption invariant
 
 `run_manifest.json.phases_completed` + the bundle must contain enough state
-for a fresh session to continue any phase with zero re-searching:
+for authorized continuation without repeating broad acquisition. Gathering
+belongs to its original session; processing belongs to its separate recorded
+author session (other author transfers require explicit recovery):
 
 - before `acquire`: query_plan + manifest suffice
 - after `acquire`: the complete task context, merged acquisition bundle,
   original responses and retrieval provenance, and pending handoff state
-  suffice to start triage after the user chooses processing
+  suffice to start triage after the user submits the prompt to the separate
+  processing skill in a different host session
 - after `triage`: corpus.jsonl suffices to start evidence work
 - after `evidence`: evidence.jsonl + claims.jsonl suffice to synthesize
 - during `synthesize`: report.md (progressive) + continuation state in the
@@ -211,5 +214,5 @@ proceeding, not the re-search.
 
 The initial handoff snapshot records gathering as it stood at the pause. Once
 processing starts, sanctioned delta waves append to the same bundle and pass
-through triage; do not refresh that snapshot or repeat its session-choice gate.
+through triage; do not refresh that snapshot or repeat its initial fresh-session boundary.
 The final fact-check snapshot binds the current full bundle independently.

@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
-"""Preserve the acquisition/processing boundary; no research or approvals.
+"""Preserve the acquisition/processing boundary; never infer a user decision.
 
 prepare checks and snapshots the gathered bundle, then leaves it awaiting the
-user. resume checks the snapshot and records a user-selected session choice.
-The skill, not this CLI, must obtain that choice before calling resume.
+user. resume accepts the user-submitted prompt only in a different host session.
+resume requires a boundary-bound record of a later user message. This local
+record is auditable evidence, not host-authenticated proof of a turn boundary.
 """
 import argparse
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
+import secrets
 import sys
 import tempfile
 
 from citation_manager import compute_source_id, FRONTMATTER_RE
 from search_quality import check_acquisition
+from workflow_guard import (unchanged_skill, workflow_digest, validate_decision,
+                            current_session_id, DECISION)
 from fact_check import (ContractError, digest, inside, load_json, load_rows, parse_json,
                         output_path, sha, validate_schema)
 
@@ -31,7 +35,7 @@ def require(condition, message):
 
 
 def snapshot(run):
-    manifest = load_json(inside(run, 'run_manifest.json'))
+    manifest = unchanged_skill(run)
     validate_schema(manifest, 'run_manifest.schema.json')
     require(manifest['query'].strip(), 'research question is empty')
     require(manifest.get('research_contract'), 'persist the complete research_contract first')
@@ -95,11 +99,7 @@ def snapshot(run):
             require(path.is_relative_to((run / 'acquisition').resolve()),
                     f'artifact escapes acquisition directory: {relative}')
         inputs[relative] = sha(path.read_bytes())
-    workflow = {str(p.relative_to(ROOT)): sha(p.read_bytes())
-                for folder in ('scripts', 'schemas', 'reference', 'templates')
-                for p in sorted((ROOT / folder).glob('*')) if p.is_file()}
-    workflow['SKILL.md'] = sha((ROOT / 'SKILL.md').read_bytes())
-    return manifest, {'version': 2, 'inputs': inputs, 'workflow_sha256': digest(workflow),
+    return manifest, {'version': 3, 'inputs': inputs, 'workflow_sha256': workflow_digest(),
                       'search_quality': quality,
                       'source_count': len(sources), 'query_count': len(queries)}
 
@@ -119,22 +119,38 @@ def write_json(path, value):
 
 def prepare(run):
     manifest, saved = snapshot(run)
+    session_id = current_session_id()
+    require(session_id == manifest['gathering_session_id'],
+            'only the original gathering session may prepare its handoff')
+    # Empty skeleton files are fine; substantive processing before the stop is not.
+    for folder in ('triage', 'evidence', 'report', 'qa'):
+        require(not any(p.is_file() and p.stat().st_size for p in (run / folder).rglob('*')),
+                f'processing artifacts already exist in {folder}; disclose the boundary violation, never launder it')
     destination = output_path(run, SNAPSHOT)
     prompt_path = output_path(run, PROMPT)
     require(not destination.exists() and not prompt_path.exists() and
             manifest.get('processing_handoff') is None,
             'handoff already exists; check/resume it, or explicitly archive it before repairing acquisition')
     saved['prepared_at'] = datetime.now(timezone.utc).isoformat()
+    saved['boundary_id'] = secrets.token_hex(16)
+    saved['gathering_session_id'] = session_id
+    saved['prepared_run_directory'] = str(run)
     prompt = (ROOT / 'templates/processing_handoff_prompt.md').read_text(encoding='utf-8')
     prompt = prompt.replace('<RUN_DIRECTORY>', str(run))
+    prompt = prompt.replace('<BOUNDARY_ID>', saved['boundary_id'])
     saved['prompt_sha256'] = sha(prompt.encode('utf-8'))
     destination.parent.mkdir(parents=True, exist_ok=True)
     write_json(destination, saved)
     prompt_path.write_text(prompt, encoding='utf-8')
     manifest['processing_handoff'] = {'status': 'awaiting_user', 'next_phase': 'triage',
-                                      'snapshot': SNAPSHOT, 'prompt': PROMPT}
+                                      'snapshot': SNAPSHOT, 'prompt': PROMPT,
+                                      'boundary_id': saved['boundary_id'],
+                                      'snapshot_sha256': digest(saved)}
     write_json(output_path(run, 'run_manifest.json'), manifest)
     return {'status': 'awaiting_user', 'next_phase': 'triage', 'prompt': str(prompt_path),
+            'boundary_id': saved['boundary_id'],
+            'required_action': 'Present the literal prompt for deep-research-processing and END THE TURN. '
+                               'A fresh user-started session is mandatory. No same-session continuation exists.',
             'source_count': saved['source_count'], 'query_count': saved['query_count'],
             'search_quality': saved['search_quality']}
 
@@ -142,14 +158,38 @@ def prepare(run):
 def check(run):
     manifest, current = snapshot(run)
     handoff = manifest.get('processing_handoff')
-    require(handoff and handoff['status'] == 'awaiting_user', 'run is not awaiting a processing choice')
+    require(handoff and handoff['status'] == 'awaiting_user', 'run is not awaiting a fresh-session user submission')
     saved = load_json(inside(run, SNAPSHOT))
     require(isinstance(saved, dict), 'handoff snapshot must contain an object')
+    require(saved.get('version') == 3, 'legacy handoff requires explicit migration to version 3')
+    require(digest(saved) == handoff['snapshot_sha256'], 'boundary snapshot changed')
+    require(saved['boundary_id'] == handoff['boundary_id'], 'boundary identity changed')
     for key, value in current.items():
         require(saved.get(key) == value, f'acquisition snapshot changed: {key}; inspect and repair before resuming')
     require(sha(inside(run, PROMPT).read_bytes()) == saved.get('prompt_sha256'),
             'processing prompt changed; inspect and repair before resuming')
     return manifest
+
+
+def resume(run, decision_path):
+    manifest = check(run)
+    require(current_session_id() != manifest['gathering_session_id'],
+            'same-session processing is forbidden; open a fresh user-started session')
+    require(decision_path is not None, 'resume requires --decision: the actual user-submitted fresh-session prompt')
+    decision = load_json(decision_path)
+    saved = load_json(inside(run, SNAPSHOT))
+    validate_decision(run, saved, decision)
+    destination = output_path(run, DECISION)
+    require(not destination.exists(), 'user decision already exists; never overwrite boundary evidence')
+    write_json(destination, decision)
+    manifest['processing_handoff']['status'] = 'processing'
+    continuation = manifest.get('continuation') or {}
+    continuation.update(previous_run_manifest=str(run / 'run_manifest.json'),
+                        resumed_at=datetime.now(timezone.utc).isoformat(),
+                        processing_session_id=current_session_id(), decision_sha256=digest(decision))
+    manifest['continuation'] = continuation
+    write_json(output_path(run, 'run_manifest.json'), manifest)
+    return {'status': 'processing', 'next_phase': 'triage', 'processing_session_id': current_session_id()}
 
 
 def main():
@@ -159,25 +199,17 @@ def main():
         command = sub.add_parser(name)
         command.add_argument('--run-dir', type=Path, required=True)
         if name == 'resume':
-            command.add_argument('--choice', choices=('same-session', 'new-session'), required=True,
-                                 help='Record the choice already made by the user')
+            command.add_argument('--decision', type=Path, help='JSON record of the actual later user message')
     args = parser.parse_args()
     run = args.run_dir.resolve()
     try:
         if args.command == 'prepare':
             result = prepare(run)
+        elif args.command == 'resume':
+            result = resume(run, args.decision)
         else:
-            manifest = check(run)
-            result = {'status': 'ready_for_processing', 'next_phase': 'triage'}
-            if args.command == 'resume':
-                manifest['processing_handoff']['status'] = 'processing'
-                continuation = manifest.get('continuation') or {}
-                continuation.update(previous_run_manifest=str(run / 'run_manifest.json'),
-                                    resumed_at=datetime.now(timezone.utc).isoformat(),
-                                    session_choice=args.choice)
-                manifest['continuation'] = continuation
-                write_json(output_path(run, 'run_manifest.json'), manifest)
-                result['session_choice'] = args.choice
+            check(run)
+            result = {'status': 'awaiting_user', 'next_phase': 'triage'}
         print(json.dumps(result))
     except (OSError, ValueError, KeyError, TypeError) as exc:
         print(json.dumps({'status': 'blocked', 'error': str(exc)}))

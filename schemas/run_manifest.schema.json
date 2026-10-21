@@ -3,8 +3,16 @@
   "title": "RunManifest",
   "description": "Manifest for a single merged-pipeline research run. Created by citation_manager.py init-run, updated as phases complete.",
   "type": "object",
-  "required": ["version", "query", "mode", "started_at", "report_dir", "artifact_paths"],
+  "required": ["version", "query", "mode", "started_at", "report_dir", "artifact_paths", "workflow_sha256", "gathering_session_id"],
   "properties": {
+    "gathering_session_id": {
+      "type": "string", "pattern": "\\S",
+      "description": "Host session identity at initialization. This session is permanently forbidden from processing its run."
+    },
+    "workflow_sha256": {
+      "type": "string", "pattern": "^[0-9a-f]{64}$",
+      "description": "Immutable skill fingerprint captured at init-run, checked before handoff and processing. Never refresh during research."
+    },
     "version": {
       "type": "string",
       "const": "1.0.0",
@@ -30,9 +38,11 @@
     },
     "processing_handoff": {
       "type": ["object", "null"],
-      "description": "Acquisition-to-processing boundary. Prepared before the mandatory pause; processing starts only after the user chooses continuation or submits the handoff prompt.",
-      "required": ["status", "next_phase", "snapshot", "prompt"],
+      "description": "Acquisition-to-processing boundary. Prepared before the mandatory pause; processing starts only when the user submits the handoff prompt in a different host session. Same-session processing is forbidden.",
+      "required": ["status", "next_phase", "snapshot", "prompt", "boundary_id", "snapshot_sha256"],
       "properties": {
+        "boundary_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+        "snapshot_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "status": {"enum": ["awaiting_user", "processing"]},
         "next_phase": {"const": "triage"},
         "snapshot": {"const": "handoff/acquisition.json"},
@@ -141,7 +151,8 @@
       "properties": {
         "previous_run_manifest": { "type": "string" },
         "resumed_at": { "type": "string", "format": "date-time" },
-        "session_choice": { "enum": ["same-session", "new-session"] },
+        "processing_session_id": {"type": "string", "pattern": "\\S"},
+        "decision_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
         "sections_completed": { "type": "array", "items": { "type": "string" } }
       },
       "default": null

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Recorded post-boundary user decision (not host-authenticated)",
+  "type": "object",
+  "required": ["version", "boundary_id", "boundary_notice", "user_message"],
+  "properties": {
+    "version": {"const": 1},
+    "boundary_id": {"type": "string", "pattern": "^[0-9a-f]{32}$"},
+    "boundary_notice": {
+      "type": "object",
+      "required": ["session_id", "message_id"],
+      "properties": {
+        "session_id": {"type": "string", "pattern": "\\S"},
+        "message_id": {"type": "string", "pattern": "\\S"}
+      },
+      "additionalProperties": false
+    },
+    "user_message": {
+      "type": "object",
+      "required": ["role", "session_id", "message_id", "received_at", "content"],
+      "properties": {
+        "role": {"const": "user"},
+        "session_id": {"type": "string", "pattern": "\\S"},
+        "message_id": {"type": "string", "pattern": "\\S"},
+        "received_at": {"type": "string", "format": "date-time"},
+        "content": {"type": "string", "pattern": "\\S"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -68,6 +68,8 @@ def read_jsonl(path: str) -> list[dict]:
 
 def cmd_init(args: argparse.Namespace) -> None:
     """Create empty evidence.jsonl if it doesn't exist."""
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir)
     out_dir = os.path.abspath(args.dir)
     path = os.path.join(out_dir, 'evidence.jsonl')
     if not os.path.exists(path):
@@ -78,6 +80,8 @@ def cmd_init(args: argparse.Namespace) -> None:
 
 def cmd_add(args: argparse.Namespace) -> None:
     """Append evidence row, print evidence_id."""
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir)
     data = json.loads(args.json)
     source_id = data.get('source_id', '')
     quote = data.get('quote', '')

@@ -1,49 +1,47 @@
-Use the installed deep-research skill to perform information processing for the
-existing research run at:
+Process this bundle in this fresh session. Boundary: <BOUNDARY_ID>
+
+Use the separate deep-research-processing skill to process the existing
+research run at:
 
 <RUN_DIRECTORY>
 
-This is my request to continue with processing in this fresh session. Do not
-initialize another run or repeat broad information gathering.
+I am submitting this prompt in a fresh session to request information processing.
+The gathering session must never process this run. Do not initialize another
+run, repeat broad gathering, or ask me to choose a continuation mode.
 
-Read SKILL.md, reference/session-boundary.md, reference/contract.md,
-reference/search-quality.md, reference/triage.md and the full
-reference/fact-checking.md. Read run_manifest.json and acquisition/query_plan.md
-for the original question, mode, research contract, constraints, assumptions,
-hypotheses, search budgets, stop reasons, dead ends and remaining leads.
-Read handoff/acquisition.json.search_quality, including unresolved searches
-and the exact native routes and controls. Failed controls and inaccessible
-searches are not negatives. Investigate any essential acquisition failure
-before interpreting results or spending a delta wave.
-Treat hypotheses as untested; acquisition has produced sources, not findings.
+Read deep-research-processing/SKILL.md and the shared engine's
+reference/session-boundary.md, reference/runtime-integrity.md,
+reference/contract.md, reference/search-quality.md, reference/triage.md and the
+complete reference/fact-checking.md. Read run_manifest.json and
+acquisition/query_plan.md for the original question, mode, full research
+contract, constraints, assumptions, untested hypotheses, budgets, stop reasons,
+dead ends, gaps and remaining leads. Read handoff/acquisition.json.search_quality;
+blocked searches and failed controls do not establish absence.
 
-Run the following with the actual run directory (update the path above if the
-bundle moved):
+Check the actual host session identity. It must differ from the recorded
+gathering_session_id. Never set, replace or spoof host identity variables.
+Record this actual user-submitted prompt and its session/message references and
+receipt time using schemas/user_decision.schema.json. Then run:
 
-python <skill>/scripts/session_handoff.py resume --run-dir <run> --choice new-session
+python <engine>/scripts/session_handoff.py resume --run-dir <run> --decision <record.json>
 
-If the check fails, stop and report the missing or changed inputs. Never invent
-lost context or replace original sources with a summary. Do not automatically
-re-run acquisition or overwrite the handoff snapshot.
+If checks fail, stop and report them. Never invent provenance or user messages,
+refresh a workflow fingerprint, rewrite the handoff or pretend another shell
+process is a fresh session. Update only the run path above if the bundle moved.
 
-The resume check binds the current workflow and saved search responses; it
-does not replace source-fitness or acquisition-completeness judgment.
+Continue phases 3–8: source triage and its bounded delta wave, evidence extraction,
+triangulation and counterevidence, synthesis, independent critique, sanctioned
+gap-filling and independent verification and red-team review for every claim
+and evidence link. Preserve every original quality requirement. This session
+is the processing author, not either independent reviewer.
 
-Continue phases 3–8: source triage and its bounded delta-acquisition loop,
-evidence extraction, triangulation and counterevidence, report synthesis,
-critique and targeted gap-filling, then independent verification and red-team
-review and the mandatory fact_check.py verify release gate. Apply every
-original quality requirement. This session remains the author; it does not
-replace either independent reviewer.
+Read source material from disk as needed and persist evidence/claims
+progressively. Preserve source IDs and original retrieval provenance. Titles
+and slugs do not prove syndication; shared origins need reviewed evidence and
+unique material must be retained. Reserve any genuine triage delta with
+triage.py begin-delta before dispatch; never reset its ledger. Add sanctioned
+delta material to the same bundle and re-triage without another initial pause.
 
-Read source material from the bundle as needed and persist evidence and claims
-as you work. Preserve stable source IDs and original retrieval provenance.
-Title/slug similarity never proves syndication. Shared-origin grouping must
-be evidence-backed and must retain nonidentical documents with unique material.
-Check current gap causes and source dispositions; use triage.py begin-delta
-to reserve the single triage wave before dispatch. Never reset its ledger.
-Use only the prescribed delta-acquisition loops for new material, append their
-output to the same bundle and re-triage it. Keep unresolved gaps visible.
-Do not pause again at the initial acquisition boundary during those loops.
-Do not treat a successful handoff check as evidence verification or a release
-approval. Deliver the report only under the existing final-QA contract.
+Keep both skills read-only. Do not run self-improvement patches or alter workflow
+memories. Deliver the report only after all final-QA gates, including the current
+fact_check.py verify contract_pass. A handoff check is not evidence verification.

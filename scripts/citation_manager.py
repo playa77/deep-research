@@ -204,6 +204,11 @@ def _make_source_record(data: dict, registered_at: str | None = None) -> tuple[d
 
 def cmd_init_run(args: argparse.Namespace) -> None:
     """Create run dir skeleton, run_manifest.json, and empty artifact files."""
+    from workflow_guard import external_run, workflow_digest, current_session_id
+    out = external_run(args.out_dir)
+    gathering_session = current_session_id()
+    if out.exists() and any(out.iterdir()):
+        raise ValueError('init-run requires an empty directory; never reset an existing run')
     out_dir = os.path.abspath(args.out_dir)
     for sub in ('acquisition/raw', 'acquisition/original', 'acquisition/retrieval', 'acquisition/agents', 'triage', 'evidence', 'report', 'qa'):
         os.makedirs(os.path.join(out_dir, sub), exist_ok=True)
@@ -226,6 +231,8 @@ def cmd_init_run(args: argparse.Namespace) -> None:
 
     manifest = {
         'version': PIPELINE_VERSION,
+        'workflow_sha256': workflow_digest(),
+        'gathering_session_id': gathering_session,
         'query': args.query or '',
         'mode': args.mode,
         'started_at': now_iso(),
@@ -473,6 +480,8 @@ def _curated_rows(sources: list[dict]) -> list[dict]:
 
 def cmd_assign_display_numbers(args: argparse.Namespace) -> None:
     """Read the curated corpus, assign stable display numbers in order."""
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir, args.sources)
     sources_path = _resolve_sources_path(args.dir, args.sources)
     sources = _curated_rows(_dedup_sources(read_jsonl(sources_path)))
 
@@ -494,6 +503,8 @@ def bibliography_title_link(source: dict) -> str:
 
 def cmd_export_bibliography(args: argparse.Namespace) -> None:
     """Generate bibliography from the curated corpus."""
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir, args.sources)
     sources_path = _resolve_sources_path(args.dir, args.sources)
     sources = _curated_rows(_dedup_sources(read_jsonl(sources_path)))
 
@@ -588,6 +599,16 @@ def main() -> None:
     p_bib.add_argument('--style', default='markdown', choices=['markdown', 'json'])
 
     args = parser.parse_args()
+    from workflow_guard import external_run
+    external_run(getattr(args, 'out_dir', None) or getattr(args, 'acq_dir', None) or args.dir)
+    if args.command in ('register-source', 'merge-sources', 'merge-query-log', 'build-source-map'):
+        from pathlib import Path
+        from workflow_guard import require_acquisition
+        location = Path(getattr(args, 'acq_dir', None) or args.dir).resolve()
+        run = next((p for p in (location, *location.parents) if (p / 'run_manifest.json').is_file()), None)
+        if run is None:
+            raise ValueError('acquisition requires an initialized run_manifest.json')
+        require_acquisition(run)
 
     dispatch = {
         'init-run': cmd_init_run,
