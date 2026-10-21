@@ -27,7 +27,7 @@ ACQUISITION ENGINE      (standardhuman mechanism)
      ├── deduplication
      └── source catalog
      │                     ← the acquisition bundle (contract.md)
-     ╞══ STOP: choose continuation here or a fresh processing session
+     ╞══ STOP: user opens a mandatory fresh processing session
      ▼
 SOURCE TRIAGE           (new phase; 199-biotech scoring machinery)
      ├── dedupe / syndication detection
@@ -54,14 +54,14 @@ Conceptually: **standardhuman = reconnaissance/intelligence collection;
 obscure primary material, and rigorous enough to distrust that material once
 found.
 
-These are also the two user-facing tasks. Gathering finishes phases 1–2 and
-merge/map; processing begins at source triage (phase 3) and runs through final
-QA (phase 8). The agent always stops at the acquisition bundle to offer either
-continuation or a fresh-session prompt. The full research contract and source
-bundle carry the inputs across; every processing and verification requirement
-is identical for either choice. See [session-boundary.md](session-boundary.md).
-Targeted delta-acquisition remains a bounded service to processing through the
-same file contract; it does not merge the two tasks or restart the initial pause.
+These are two separate skill entry points and mandatory separate sessions.
+`deep-research` gathers phases 1–2 and merge/map, seals the acquisition bundle,
+displays the fresh-session prompt and ends the turn. The user starts a new
+session with `deep-research-processing`, which begins at triage and runs through
+final QA. The original host identity is permanently forbidden from processing
+its run. No continuation choice exists. See [session-boundary.md](session-boundary.md).
+Targeted delta acquisition remains a bounded service of the processor using the
+same file contract; it does not restart the initial gathering task.
 
 ## What was stolen vs. discarded
 

@@ -430,6 +430,8 @@ Uses free DOI resolver - no API key needed.
         print(f"ERROR: Report file not found: {report_path}")
         sys.exit(1)
 
+    from workflow_guard import processing_for_paths
+    processing_for_paths(report_path)
     verifier = CitationVerifier(report_path, strict_mode=args.strict)
     print('DIAGNOSTICS ONLY: metadata/accessibility do not establish citation identity, entailment, or truth.')
     passed = verifier.verify_all()

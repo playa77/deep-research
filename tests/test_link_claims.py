@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from boundary_fixtures import processing_fixture
 
 SCRIPTS = os.path.join(os.path.dirname(__file__), '..', 'scripts')
 SCRIPT = os.path.join(SCRIPTS, 'link_claims.py')
@@ -25,6 +26,7 @@ def run_link(*args) -> tuple[int, dict]:
 class TestLinkClaims(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
+        processing_fixture(self.tmp)
         self.ev = os.path.join(self.tmp, 'evidence')
         os.makedirs(self.ev)
         # corpus with two sources in display order

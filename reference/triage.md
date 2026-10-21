@@ -1,8 +1,8 @@
 # Phase 3: Source Triage
 
 This is the first phase of the **information-processing task**, after gathering
-has stopped and the user has chosen continuation here or submitted the
-fresh-session handoff prompt. Resume through
+has stopped and the user has submitted the handoff prompt to the separate
+deep-research-processing skill in a different host session. Resume through
 [session-boundary.md](session-boundary.md) before running triage. Later targeted
 delta-acquisition loops re-enter triage without another initial-boundary pause.
 

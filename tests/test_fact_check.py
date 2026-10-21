@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from boundary_fixtures import processing_fixture, session_env
 
 SCRIPTS = Path(__file__).resolve().parents[1] / 'scripts'
 sys.path.insert(0, str(SCRIPTS))
@@ -74,6 +75,7 @@ class ContractFixture(unittest.TestCase):
         self.query = search_record(self.run, 'q_test', angle='counterevidence',
                                    outcome='no_results', control_query_id='q_control')
         rows(self.run / 'acquisition/query_log.jsonl', [control, self.query])
+        processing_fixture(self.run)
         self.doc, warnings = fc.prepare(self.run)
         self.assertEqual(warnings, [])
         self.doc['author_id'] = 'writer'
@@ -373,6 +375,24 @@ class ArithmeticTests(unittest.TestCase):
 
 
 class AdditionalContractTests(ContractFixture):
+    def test_independent_reviewer_can_inspect_but_cannot_author_or_release(self):
+        (self.run / 'qa/fact_check.json').write_text(json.dumps(self.doc))
+        before = {str(p.relative_to(self.run)): p.read_bytes()
+                  for p in self.run.rglob('*') if p.is_file()}
+        command = [sys.executable, str(SCRIPTS / 'fact_check.py')]
+        review_env = session_env('synthetic:independent-reviewer')
+        inspected = subprocess.run(command + ['inspect', '--run-dir', str(self.run)],
+                                   capture_output=True, text=True, env=review_env)
+        self.assertEqual(inspected.returncode, 0, inspected.stdout + inspected.stderr)
+        self.assertEqual(json.loads(inspected.stdout)['status'], 'diagnostic_only')
+        self.assertEqual(before, {str(p.relative_to(self.run)): p.read_bytes()
+                                  for p in self.run.rglob('*') if p.is_file()})
+        for operation in ('prepare', 'verify'):
+            refused = subprocess.run(command + [operation, '--run-dir', str(self.run)],
+                                     capture_output=True, text=True, env=review_env)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn('different session', refused.stdout + refused.stderr)
+
     """Mutations requiring fresh synthetic signatures to exercise deeper gates."""
 
     def test_hidden_only_bibliography_url_blocks_release_after_fresh_reviews(self):
@@ -456,7 +476,9 @@ class AdditionalContractTests(ContractFixture):
     def test_two_origins_only_pass_quick(self):
         self.add_origins(count=2)
         self.blocked('fewer than 3')
-        (self.run / 'run_manifest.json').write_text('{"mode":"quick"}')
+        manifest = fc.load_json(self.run / 'run_manifest.json')
+        manifest['mode'] = 'quick'
+        (self.run / 'run_manifest.json').write_text(json.dumps(manifest))
         self.refresh()
         self.assertEqual(fc.verify(self.run, self.doc)['status'], 'contract_pass')
 
@@ -491,7 +513,9 @@ class AdditionalContractTests(ContractFixture):
         self.assertEqual(fc.verify(self.run, self.doc)['status'], 'contract_pass')
 
     def test_manifest_scope_change_invalidates_review(self):
-        (self.run / 'run_manifest.json').write_text('{"mode":"standard","query":"different research question"}')
+        manifest = fc.load_json(self.run / 'run_manifest.json')
+        manifest['query'] = 'different research question'
+        (self.run / 'run_manifest.json').write_text(json.dumps(manifest))
         self.blocked('snapshot changed')
 
     def test_no_automatic_semantic_approval_for_negation_roles_or_units(self):

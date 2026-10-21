@@ -191,6 +191,8 @@ def step_dedupe(sources: list[dict], run_dir: str) -> None:
     Titles, URL slugs and near-duplicate bodies are review leads, never proof
     that publishers share an origin. No transitive closure of guesses.
     """
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     bodies = {}
     for source in sources:
         for key in ('duplicate_of', 'syndication_with', 'lineage_with',
@@ -262,6 +264,8 @@ def step_dedupe(sources: list[dict], run_dir: str) -> None:
 def step_cluster(sources: list[dict], run_dir: str) -> None:
     """Assign independence_group_id: same registrable domain or syndication
     cluster = one group. Manual overrides win."""
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     overrides = load_overrides(run_dir)
     parent: dict[str, str] = {}
 
@@ -318,6 +322,8 @@ def step_cluster(sources: list[dict], run_dir: str) -> None:
 
 def step_score(sources: list[dict], run_dir: str) -> None:
     """Attach credibility 0-100 + recommendation via source_evaluator."""
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     evaluator = SourceEvaluator()
     # bodies needed again for content-based signals
     for s in sources:
@@ -337,6 +343,8 @@ def step_select(sources: list[dict], run_dir: str, max_sources: int,
                 min_credibility_reserve: float = MIN_CREDIBILITY,
                 min_per_angle: int = DEFAULT_MIN_PER_ANGLE) -> None:
     """Cover planned angles with eligible sources, then fill by global rank."""
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     if max_sources < 1 or min_per_angle < 1:
         raise ValueError('max_sources and min_per_angle must be positive')
     for s in sources:
@@ -408,6 +416,8 @@ def step_select(sources: list[dict], run_dir: str, max_sources: int,
 def step_gaps(sources: list[dict], run_dir: str,
               min_per_angle: int = DEFAULT_MIN_PER_ANGLE) -> list[dict]:
     """Distinguish genuine acquisition shortfalls from corpus-cap constraints."""
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     aliases = plan_angle_aliases(run_dir)
     per_angle: dict[str, list[dict]] = {}
     for s in sources:
@@ -444,6 +454,8 @@ def step_gaps(sources: list[dict], run_dir: str,
 
 def write_report(sources: list[dict], gaps: list[dict], run_dir: str,
                  max_sources: int, min_per_angle: int = DEFAULT_MIN_PER_ANGLE) -> str:
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     selected = [s for s in sources if s.get('triage_status') == 'selected']
     reserve = [s for s in sources if s.get('triage_status') == 'reserve']
     dropped = [s for s in sources if s.get('triage_status') == 'dropped']
@@ -517,6 +529,8 @@ def write_report(sources: list[dict], gaps: list[dict], run_dir: str,
 
 def run_triage(run_dir: str, mode: str, max_sources: int | None,
                min_per_angle: int) -> dict:
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     from pathlib import Path
     from fact_check import output_path, require
     result_path = output_path(Path(run_dir).resolve(), 'triage/triage_result.json')
@@ -590,6 +604,8 @@ def triage_input_digest(run_dir: str) -> str:
 
 def begin_delta(run_dir: str) -> dict:
     """Reserve the single triage wave on disk BEFORE any dispatch."""
+    from workflow_guard import require_processing
+    require_processing(run_dir)
     from pathlib import Path
     from fact_check import inside, load_json, output_path, require
     from search_quality import check_acquisition
@@ -654,6 +670,8 @@ def main() -> None:
         p.add_argument('--min-per-angle', type=positive_int, default=DEFAULT_MIN_PER_ANGLE)
 
     args = parser.parse_args()
+    from workflow_guard import require_processing
+    require_processing(args.run_dir)
 
     if args.command == 'begin-delta':
         print(json.dumps(begin_delta(args.run_dir), indent=2))

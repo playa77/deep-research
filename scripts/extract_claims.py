@@ -167,6 +167,8 @@ def extract_sentences(text: str) -> list[str]:
 
 def cmd_extract(args: argparse.Namespace) -> None:
     """Extract atomic claims from a markdown report."""
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir, args.report)
     report_path = args.report
     if not os.path.exists(report_path):
         print(json.dumps({'error': f'Report not found: {report_path}'}), file=sys.stderr)
@@ -229,6 +231,8 @@ def cmd_extract(args: argparse.Namespace) -> None:
 
 def cmd_add(args: argparse.Namespace) -> None:
     """Manually add a single claim."""
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir)
     data = json.loads(args.json)
     section_id = data.get('section_id', 'unknown')
     text = data.get('text', '')

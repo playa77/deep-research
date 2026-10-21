@@ -7,6 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from boundary_fixtures import processing_fixture
 
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'citation_manager.py')
 
@@ -290,6 +291,7 @@ class TestDisplayNumbersAndBibliography(unittest.TestCase):
         from validate_report import bibliography_presentation_errors
         with tempfile.TemporaryDirectory() as d:
             run_cm('init-run', '--out-dir', d, '--query', 'test')
+            processing_fixture(d)
             sources = [
                 {'raw_url': 'https://example.com/study_(final)?version=2&lang=en#results',
                  'title': 'Étude [finale] & results', 'authors': ['A. Author'], 'year': '2026'},
@@ -326,6 +328,7 @@ class TestDisplayNumbersAndBibliography(unittest.TestCase):
     def test_prefers_corpus_over_acquisition(self):
         with tempfile.TemporaryDirectory() as d:
             run_cm('init-run', '--out-dir', d, '--query', 'test')
+            processing_fixture(d)
             acq = os.path.join(d, 'acquisition')
             run_cm('register-source', '--json', json.dumps(
                 {'raw_url': 'https://a.com/1', 'title': 'A'}), '--dir', acq)
@@ -349,6 +352,7 @@ class TestDisplayNumbersAndBibliography(unittest.TestCase):
     def test_dropped_rows_excluded_from_numbering(self):
         with tempfile.TemporaryDirectory() as d:
             run_cm('init-run', '--out-dir', d, '--query', 'test')
+            processing_fixture(d)
             corpus = os.path.join(d, 'triage', 'corpus.jsonl')
             rows = []
             for i, (url, status) in enumerate([
@@ -373,6 +377,7 @@ class TestDisplayNumbersAndBibliography(unittest.TestCase):
     def test_bibliography_includes_publisher(self):
         with tempfile.TemporaryDirectory() as d:
             run_cm('init-run', '--out-dir', d, '--query', 'test')
+            processing_fixture(d)
             acq = os.path.join(d, 'acquisition')
             run_cm('register-source', '--json', json.dumps(
                 {'raw_url': 'https://a.com/1', 'title': 'A', 'publisher': 'Pub Co',

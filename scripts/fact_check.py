@@ -96,6 +96,8 @@ def inside(run, relative):
 
 
 def output_path(run, relative):
+    from workflow_guard import external_run
+    external_run(run)
     candidate = run / relative
     for part in (candidate, *candidate.parents):
         if part == run:
@@ -144,8 +146,12 @@ def inventory(text):
             for n, line in enumerate(text.splitlines(), 1) if line.strip()]
 
 
-def bundle(run):
+def bundle(run, reviewer=False):
+    from workflow_guard import require_processing, SNAPSHOT, PROMPT, DECISION
+    require_processing(run, reviewer=reviewer)
     paths = {p: inside(run, p) for p in CORE}
+    for relative in (SNAPSHOT, PROMPT, DECISION):
+        paths[relative] = inside(run, relative)
     corpus = load_rows(paths['triage/corpus.jsonl'])
     evidence = load_rows(paths['evidence/evidence.jsonl'])
     sources = indexed(corpus, 'source_id')
@@ -628,7 +634,11 @@ def main():
         p.add_argument('--run-dir', type=Path, required=True)
     args = parser.parse_args()
     run = args.run_dir.resolve()
+    boundary_verified = False
     try:
+        from workflow_guard import require_processing
+        require_processing(run, reviewer=args.command == 'inspect')
+        boundary_verified = True
         output = output_path(run, 'qa/fact_check.json')
         if args.command == 'verify':
             write_result(run, {'status': 'blocked', 'errors': ['verification has not completed']})
@@ -643,7 +653,7 @@ def main():
             write_result(run, {'status': 'blocked', 'errors': ['new review snapshot is unreviewed']})
             result = {'status': 'unreviewed', 'contract': str(output), 'warnings': warnings}
         elif args.command == 'inspect':
-            inputs, _, _, _, _ = bundle(run)
+            inputs, _, _, _, _ = bundle(run, reviewer=True)
             doc = load_json(output)
             result = {'status': 'diagnostic_only', 'inputs_sha256': digest(inputs),
                       'claim_sha256': {c['claim_id']: claim_digest(c) for c in doc['claims']},
@@ -655,7 +665,7 @@ def main():
         # A malformed bundle or an unexpected implementation failure must never
         # leave the previous success as the current machine-readable decision.
         result = {'status': 'blocked', 'errors': [f'{type(exc).__name__}: {exc}']}
-    if args.command == 'verify':
+    if args.command == 'verify' and (boundary_verified or (run / 'qa/fact_check_result.json').exists()):
         # Also overwrite a stale prior success when parsing/input checks fail.
         try:
             write_result(run, result)

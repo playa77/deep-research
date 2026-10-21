@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from boundary_fixtures import processing_fixture
 
 SCRIPT = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'verify_claim_support.py')
 
@@ -37,6 +38,7 @@ class TestVerifySupported(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         # Sources
         write_jsonl(os.path.join(self.tmpdir, 'sources.jsonl'), [
             {'source_id': 'src_quantum_001', 'title': 'Quantum Computing 2024'},
@@ -84,6 +86,7 @@ class TestVerifyUnsupported(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         write_jsonl(os.path.join(self.tmpdir, 'sources.jsonl'), [])
         write_jsonl(os.path.join(self.tmpdir, 'evidence.jsonl'), [])
         write_jsonl(os.path.join(self.tmpdir, 'claims.jsonl'), [
@@ -116,6 +119,7 @@ class TestVerifyMixed(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         write_jsonl(os.path.join(self.tmpdir, 'sources.jsonl'), [])
         write_jsonl(os.path.join(self.tmpdir, 'evidence.jsonl'), [])
         write_jsonl(os.path.join(self.tmpdir, 'claims.jsonl'), [
@@ -158,6 +162,7 @@ class TestVerifyPartial(unittest.TestCase):
 
     def setUp(self):
         self.tmpdir = tempfile.mkdtemp()
+        processing_fixture(self.tmpdir)
         write_jsonl(os.path.join(self.tmpdir, 'sources.jsonl'), [
             {'source_id': 'src_nist_001', 'title': 'NIST PQC Standards'},
         ])

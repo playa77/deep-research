@@ -1,5 +1,9 @@
 # Acquisition, triage and handoff rework
 
+Historical audit of version 0.4.0. The two-skill, mandatory fresh-session
+architecture in [boundary-hardening-audit.md](boundary-hardening-audit.md)
+supersedes its session-boundary behavior in version 0.5.0.
+
 Audit date: 19 October 2026. Baseline: merged PR #4, commit `10d6eb4`.
 This is a code/protocol audit and local adversarial reproduction. The quoted
 production research bundle was not available here; no live CERL or

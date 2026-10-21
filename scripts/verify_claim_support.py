@@ -49,6 +49,8 @@ def cmd_verify(args):
         run = Path(args.run_dir).resolve() if args.run_dir else (directory.parent if directory.name == 'evidence' else directory)
         return subprocess.call([sys.executable, str(Path(__file__).with_name('fact_check.py')),
                                 'verify', '--run-dir', str(run)])
+    from workflow_guard import processing_for_paths
+    processing_for_paths(args.dir, args.run_dir)
     claims = load_rows(directory / 'claims.jsonl')
     evidence = load_rows(directory / 'evidence.jsonl')
     index = {e['evidence_id']: e for e in evidence}
